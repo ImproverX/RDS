@@ -11,23 +11,24 @@ STEK3:	.EQU	0DF40H
 	CALL	BIOS	; +12
 	CALL	BIOS	; +15
 	CALL	BIOS	; +18
-	CALL	BIOS	; +1B
-	CALL	BIOS	; +1E
-	CALL	BIOS	; +21
-	CALL	BIOS	; +24
-	CALL	BIOS	; +27
-	CALL	BIOS	; +2A
+	CALL	BIOS	; +1B	SELDSK
+	CALL	BIOS	; +1E	SETTRK
+	CALL	BIOS	; +21	SETSEC
+	CALL	BIOS	; +24	SETDMA
+	CALL	BIOS	; +27	READ
+	CALL	BIOS	; +2A	WRITE
 	CALL	BIOS	; +2D
 	CALL	BIOS	; +30
-	JMP	DYSPLY	; +33
-DYSINT:	JMP	0	; +36
-	JMP	DRAW	; +39
-	JMP	SCROLL	; +3C
-	JMP	CLS	; +3F
-	JMP	CURS	; +42
-DREXIT:	JMP	0	; +45
-	.DW	ZAGA
-	.DW	DRTAB
+	JMP	DYSPLY	; +33	VTAB-6
+DYSINT:	JMP	0	; +36	VTAB-3
+	JMP	DRAW	; +39	VTAB
+	JMP	SCROLL	; +3C	VTAB+3
+	JMP	CLS	; +3F	VTAB+6
+	JMP	CURS	; +42	VTAB+9
+DREXIT:	JMP	0	; +45	VTAB+12
+	.DW	ZAGA	; +48	VTAB+15
+	.DW	DRTAB	; +4A	VTAB+17
+;
 BIOS:	DI
 	POP	H
 	MOV	A,L
@@ -56,6 +57,7 @@ BIOS10:	LXI	SP,0
 	EI
 	RET
 BSP10:	.DB	0
+;
 WBOOT:	DI
 	LXI	SP,0
 	LDA	15
@@ -109,6 +111,7 @@ SCR10:	MOV	M,D
 	LDA	15
 	OUT	10H
 	RET
+;
 CLS:	XRA	A
 	OUT	10H
 	LXI	H,0
@@ -132,6 +135,7 @@ CLS20:	LXI	SP,0
 	LDA	15
 	OUT	10H
 	RET
+;
 DYSPLY:	PUSH	H
 	PUSH	PSW
 	LXI	H,0
@@ -147,6 +151,7 @@ DYSPLY:	PUSH	H
 	POP	H
 	EI
 	RET
+;
 CURS:	XRA	A
 	OUT	10H
 	MOV	A,D
@@ -173,24 +178,7 @@ CURS:	XRA	A
 	LDA	15
 	OUT	10H
 	RET
-ZAGA:	.DW 0,0,0,0,DIRB,PARA,CSVA,ALVA
-ZAGB:	.DW 0,0,0,0,DIRB,PARB,CSVB,ALVB
-ZAGC:	.DW 0,0,0,0,DIRB,PARC,0,ALVC
-PARA:	.DW 40
-	.DB 4,15,0
-	.DW 187H,127,0C0H,32,8
-PARB:	.DW 40
-	.DB 4,15,0
-	.DW 187H,127,0C0H,32,8
-PARC:	.DW 8			; ещё одна таблица в b7h.asm, строка 1581
-	.DB 3,7,0
-	.DW 235,63,0C0H,0,0	; 219...
-DIRB:	.DS	128	; <=
-CSVA:	.DS	32	; <=
-CSVB:	.DS	32	; <=
-ALVA:	.DS	51	; <=
-ALVB:	.DS	51	; <=
-ALVC:	.DS	33	; <=
+;
 DRAW:	OUT	10H
 	JMP	0
 DR0:
@@ -423,8 +411,61 @@ INVE:	NOP
 	DCR	B
 	JNZ	DR710
 	JMP	DRW10
+;
 DRTAB:	.DW DR0,DR1,DR2,DR3,DR4,DR5,DR6,DR7
 INVTAB:	.DW INV0,INV2,INV4,INV6,INV8,INVA,INVC,INVE
+;
+ZAGA:	.DW 0,0,0,0,DIRB,PARA,CSVA,ALVA
+ZAGB:	.DW 0,0,0,0,DIRB,PARB,CSVB,ALVB
+ZAGC:	.DW 0,0,0,0,DIRB,PARC,0,ALVC
+ZAGD:	.DW 0,0,0,0,DIRB,PARD,0,ALVD
+; 00 адрес таблицы трансляции логических секторов в физические (передается функции SECTRAN в DE) или 0 если трансляция не нужна
+; 01 просто ноль
+; 02 просто ноль
+; 03 просто ноль
+; 04 адрес 128 байтного буфера для операций с директорием. Это поле у всех DPH в системе может совпадать.
+; 05 адрес таблицы параметров диска. Допускается совместное использование одной и той же таблицы разными DPH.
+; 06 адрес области используемой для контроля смены диска. Для каждого DPH в системе должна быть своя область.
+; 07 адрес области для контроля за заполнением диска. Для каждого DPH в системе должна быть своя область.
+;
+PARA:	.DW 40
+	.DB 4,15,0
+	.DW 187H,127,0C0H,32,8
+PARB:	.DW 40
+	.DB 4,15,0
+	.DW 187H,127,0C0H,32,8
+PARC:	.DW 8
+	.DB 3,7,0
+	.DW 235,63,0C0H,0,0	; 219...
+PARD:	.DW 8
+	.DB 3,7,0
+	.DW 235,63,0C0H,0,0
+; Параметры диска:
+; DW SPT - количество секторов (по 128 байт) на дорожку;
+; DB BSH - количество бит, на которое необходимо сдвинуть размер логического сектора, чтобы получить размер кластера
+; DB BLM - маска кластера - (размер_кластера/128)-1;
+; DB ЕХМ - маска директорной записи: если ЕХМ=0, то максимальный размер, адресуемый одной директорной записью, равен 16К; если ЕХМ=1, то - 32К и т.д.
+; DW DSM - объем памяти на диске в блоках минус 1 (не считая системных дорожек)
+; DW DRM - количество входов в директорию -1
+; DB AL0,1 - битовая шкала занятости BLS директорией. Начало шкалы - бит 7 AL0, конец - бит 0 AL1. Количество единиц, заполняющих AL0,1 (от начала шкалы) - (DRM+BLS/32)/(BLS/32).
+	; // определяет, какие блоки зарезервированы
+	; // под директорию. Каждый  бит AL0,AL1, 
+	; // начиная со старшего бита AL0 и кончая 
+	; // младшим битом AL1, значением 1 резервирует
+	; // один блок данных для директории. Нужно
+	; // резервировать необходимое число блоков
+	; // для хранения входов в директорию: 32*DRM/BLS
+; DW CKS - размер области CSV в DPH. Для сменных дисков - (DRM+1)/4, для не сменных - 0.
+; DW OFF - количество зарезервированных дорожек на диске (с системой например). 
+;
+DIRB:	.DS	128	; <=
+CSVA:	.DS	32	; <=
+CSVB:	.DS	32	; <=
+ALVA:	.DS	51	; <=
+ALVB:	.DS	51	; <=
+ALVC:	.DS	33	; <=
+ALVD:	.DS	33	; <=
+;
 	.org 0104FFh	; выравнивание размера
 	.db 0
 	.END
