@@ -11,10 +11,13 @@
 	JMP	INKEY
 	.DW	XX	; +1Eh
 DISKI:	.EQU	0AE33H
-VIRADR:	.EQU	0D400H
-VTAB:	.EQU	0FB39H
+;DISKS:	.EQU	0AE46H	; количество дисковых устройств -1
+VIRADR:	.EQU	0FB00h	; == адрес начала virt
+;TDSK:	.EQU	VIRADR+4Ch	; ПП проверки наличия второго КД
+VIRSRC:	.EQU	0D400H	; == адрес хранения virt
+VTAB:	.EQU	VIRADR+39H
 SYMBUF:	.EQU	VTAB+17
-VVECT:	.DW VTAB,VTAB+3,VTAB+6,VTAB+9
+VVECT:	.DW VTAB,VTAB+3,VTAB+6,VTAB+9	; DRAW,SCROLL,CLS,CURS
 FONT:	.EQU	0C000H
 XX:	.DB	0	; XX+00h (CA28h)
 CURX:	.DB	0	; +01h
@@ -48,29 +51,30 @@ MIGCN:	.DB	8	; +35h
 START:	DI
 	MVI	A,81H
 	OUT	4
-	LXI	H,0FB03H
+	LXI	H,VIRADR+03H	; 0FB03h
 	SHLD	1
-	LXI	H,0FB00H
+	LXI	H,VIRADR	; 0FB00h
 	SHLD	6
 	SHLD	9
-	LXI	H,VIRADR
-	LXI	D,0FB00H
+	LXI	H,VIRSRC	; 0D400h
+	LXI	D,VIRADR	; 0FB00h
 ST10:	MOV	A,M
 	STAX	D
 	INX	H
 	INX	D
-	MOV	A,D
-	ANA	A
-	JNZ	ST10
-	LHLD	SYMBUF
+	XRA	A	;MOV	A,D
+	ORA	D	;ANA	A
+	JNZ	ST10	; копирование virt (D400-D8FF)->(FB00-FFFF)
+	LHLD	SYMBUF	; DRTAB в virt
 	LXI	D,DRTAB
-	MVI	B,48
-ST11:	MOV	A,M
-	STAX	D
-	INX	H
-	INX	D
-	DCR	B
-	JNZ	ST11
+	MVI	B,32	;<= было 48
+	CALL	COPY	; копирование 32 байт из adr(HL) в adr(DE)
+;ST11:	MOV	A,M	; заменить на call copy ????
+;	STAX	D
+;	INX	H
+;	INX	D
+;	DCR	B
+;	JNZ	ST11	; цикл
 	LXI	H,PRNT12
 	SHLD	VTAB+13
 	LHLD	VTAB+1
@@ -78,54 +82,54 @@ ST11:	MOV	A,M
 	INX	H
 	INX	H
 	SHLD	PRNT11+1
-	MVI	A,0DAH
+	MVI	A,0DAH	; = JC
 	STA	PRNT13
 	LXI	H,DYSPLY
 	SHLD	VTAB-2
 	LXI	H,VTAB-6
 	SHLD	39H
 	MVI	A,80H
-	STA	SETCOL
-	MVI	A,0C3H
+	STA	SETCOL	; установка палитры 80h раз
+	MVI	A,0C3H	; = JMP
 	STA	38H
 	STA	0
 	STA	5
 	STA	8
-	LHLD	VTAB+15
+	LHLD	VTAB+15	; ссылка на ZAGA в virt
 	PUSH	H
 	XCHG
-	LHLD	DISKI
+	LHLD	DISKI	; ссылка на ссылку на ZAGA в b7h
 	PUSH	H
 	MOV	A,M
 	INX	H
 	MOV	H,M
-	MOV	L,A
-	PUSH	H
-	PUSH	D
-	MVI	C,3
+	MOV	L,A	; HL = ссылка на ZAGA в b7h
+;	PUSH	H
+;	PUSH	D
+	MVI	C,4	; счётчик дисков
 ST1A:	PUSH	B
 	MVI	B,8
-	CALL	COPY
+	CALL	COPY	; копирование 8 байт из adr(HL) в adr(DE)
 	LXI	B,8
 	DAD	B
 	XCHG
-	DAD	B
+	DAD	B	; пропускаем 8 байт
 	XCHG
 	POP	B
 	DCR	C
-	JNZ	ST1A
-	POP	H
-	LXI	B,93
-	DAD	B
-	XCHG
-	POP	H
-	DAD	B
-	LXI	B,327
-	CALL	BCOPY
+	JNZ	ST1A	; цикл копирования параметров ???
+;	POP	H
+;	LXI	B,93
+;	DAD	B
+;	XCHG
+;	POP	H
+;	DAD	B	; HL = DIRB b7h, DE = DIRB virt
+;	LXI	B,327
+;	CALL	BCOPY	; копирование DIRB,CSVA,CSVB,ALVA,ALVB,ALVC из b7h в virt
 	LXI	B,10H
-	POP	H
-	POP	D
-	MVI	A,3
+	POP	H	; HL = DISKI b7h
+	POP	D	; DE = ZAGA virt
+	MVI	A,4	; количество дисков
 ST12:	MOV	M,E
 	INX	H
 	MOV	M,D
@@ -134,10 +138,15 @@ ST12:	MOV	M,E
 	DAD	B
 	XCHG
 	DCR	A
-	JNZ	ST12
+	JNZ	ST12	; цикл: меняем таблицу описателей дисков в b7h на virt
 	XRA	A
 	STA	3
-	STA	4
+	MVI	A,2	;+++
+	STA	4	; номер текущего диска = 2 (C:) (было 0)
+;
+;	CALL	TDSK	; ПП проверки наличия второго КД (virt)
+;	STA	DISKS
+;
 	LDA	BORD
 	ORI	10H
 	STA	BORD
@@ -149,15 +158,17 @@ ST12:	MOV	M,E
 	XRA	A
 	STA	3EH
 	RET
-BCOPY:	MOV	A,M
-	STAX	D
-	INX	H
-	INX	D
-	DCX	B
-	MOV	A,B
-	ORA	C
-	JNZ	BCOPY
-	RET
+;
+;BCOPY:	MOV	A,M
+;	STAX	D
+;	INX	H
+;	INX	D
+;	DCX	B
+;	MOV	A,B
+;	ORA	C
+;	JNZ	BCOPY
+;	RET
+;
 COPY:	MOV	A,M
 	STAX	D
 	INX	H
@@ -165,6 +176,7 @@ COPY:	MOV	A,M
 	DCR	B
 	JNZ	COPY
 	RET
+;
 VIRT:	PUSH	H
 	PUSH	D
 	PUSH	B
@@ -1150,7 +1162,8 @@ TABGR:	.DB 94H,91H,94H,83H,90H,0A9H,84H,0AAH,92H,8FH,93H,95H
 TMASC:	.DB 0E0H,0,70H,0,38H,0,1CH,0
 	.DB 0EH,0,7,0,3,080H,1,0C0H
 DRTAB:	.DS	16
-INVTAB:	.DS	32
+INVTAB:	.DS	16
+;
 	.org 0D3FFh	; выравнивание размера
 	.db 0
 	.END
