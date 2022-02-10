@@ -1,10 +1,10 @@
 ;(перед компилированием преобразовать в CP866)
 	.ORG	0AE00H
 ZAPL:	.EQU	0D380H	;DISP !
-ZAPL2:	.EQU	0C000H
+ZAPL2:	.EQU	0BF80h	;было 0C000H	;+++++++++++ b7h
 BDSLDS:	.EQU	0AC2DH	;== .dw AAC21 bdos.asm
 CURDSK:	.EQU	0A34EH	;== .dw DA342 bdos.asm
-DRIVSP:	.EQU	0C000H
+DRIVSP:	.EQU	0C000H	;+++++++++++ b7h DF70h
 BDPRNT:	.EQU	0A18AH	;== .dw AA190 bdos.asm
 BDDAT:	.EQU	0ADBDH	;== .dw DADB1 bdos.asm
 BDDAT2:	.EQU	0ADC5H	;== .dw DADB9 bdos.asm
@@ -19,14 +19,29 @@ INBYT:	.EQU	0CA06H
 OUTBYT:	.EQU	0CA0CH
 LST:	.EQU	0CA0FH
 RDMA:	.EQU	0D900H	; (L должно быть =0)
-VDMA:	.EQU	0DE80H
-VIRT:	.EQU	0DE00H
+VDMA:	.EQU	0DE80H	; 128 байт
+VIRD7:	.EQU	0DE00H
 BATPAR:	.EQU	0DD00H
-SWAP:	.EQU	0DD80H
-DDMA:	.EQU	0FF00H
+SWAP:	.EQU	0DD80H	; буфер для свапа ПП при чтении данных в адреса 9F00-E000
 P10:	.EQU	20H
-CPM:	.EQU	0A011H
-CPM0:	.EQU	0A006H
+CPM:	.EQU	0A011H	;== AA011 bdos.asm
+CPM0:	.EQU	0A006H	;== 0A006h bdos, там JMP AA011
+;
+VIRADR:	.EQU	0FB00h	;== адрес начала virt
+VIRSRC:	.EQU	0D400H	;== адрес хранения virt
+VPAR:	.EQU	0FDBFh	;== PARA (virt)
+PARA:	.EQU	VPAR-VIRADR+VIRSRC	; == адрес хранения PARA virt
+PARB:	.EQU	PARA+15
+PARC:	.EQU	PARB+15
+PARD:	.EQU	PARC+15
+DIRBUF:	.EQU	PARD+15
+CSVA:	.EQU	DIRBUF+128
+CSVB:	.EQU	CSVA+32
+ALVA:	.EQU	CSVB+32
+ALVB:	.EQU	ALVA+51
+ALVC:	.EQU	ALVB+51
+ALVD:	.EQU	ALVC+33
+;
 CBIOS:
 	JMP	COLD	; +0
 	JMP	WBOOT	; +3
@@ -51,9 +66,11 @@ CBIOS:
 	JMP	BDREST	; +3B
 	JMP	NBDOS	; +3E
 	.DW	HDDAT	; +41
-TYPEWR:	.DB	0
-FTRACK:	.DB	0
-WOPER:	.DB	0
+TYPEWR:	.DB	0	; +43
+FTRACK:	.DB	0	; +44
+WOPER:	.DB	0	; +45
+DISKS:	.DB	3	; +46 -- количество дисковых устройств -1
+;
 BDSEAR:	SHLD	DMA
 	CALL	READ10
 	RET
@@ -74,7 +91,7 @@ BDRS10:	INR	C
 ;
 COLD:	LDA	3EH
 	ANA	A
-	JZ	0FB03H
+	JZ	VIRADR+3	; 0FB03H
 	DI
 	DCR	A
 	JZ	COLD10
@@ -82,42 +99,57 @@ COLD:	LDA	3EH
 	ANI	7FH
 	JZ	COLD10
 	STA	3EH
-	MVI	A,0C9H
+	MVI	A,0C9H	; = JMP
 	STA	38H
 	MVI	A,1
 	STA	3FH	; режим обработки ошибок
 	LHLD	DISKI
 	LXI	D,ZAGA
-	PUSH	H
-	PUSH	D
-	MVI	C,3
+	MOV	A,H
+	CMP	D
+	JZ	SKCP	; >>> DRIVEA = ZAGA b7h, не надо копировать, пропуск
+	PUSH	H	; -> ZAGA virt
+;	PUSH	D	; -> ZAGA b7h
+	MVI	C,4	; количество дисков
 COLD02:	PUSH	B
 	MVI	B,8
-	CALL	COPY10
+	CALL	COPY10	; копирование ZAGA из virt в b7h, 8 байт
 	LXI	B,8
 	DAD	B
 	XCHG
 	DAD	B
 	XCHG
-	POP	B
+	POP	B	; пропуск 8 байт
 	DCR	C
-	JNZ	COLD02
-	POP	H
-	LXI	B,93
-	DAD	B
-	XCHG
-	POP	H
-	DAD	B
-	LXI	B,327
-	CALL	BCOPY
+	JNZ	COLD02	; цикл
+;	POP	H	; <- ZAGA b7h
+;	LXI	B,124	; =[len(ZAGA)+len(PARA)]*(кол-во дисков); 3 диска == 93
+;	DAD	B	; = DIRBUF b7h !!!!!!!!!!!!!!!!!!!!!
+;	XCHG
+	LXI	D,DIRBUF
+	POP	H	; <- ZAGA virt
+	LXI	B,124	; =[len(ZAGA)+len(PARA)]*(кол-во дисков); 3 диска == 93
+	DAD	B	; = DIRBUF
+	LXI	B,360	; 327 == 3 диска
+;	CALL	BCOPY
+BCOPY:	MOV	A,M
+	STAX	D
+	INX	H
+	INX	D
+	DCX	B
+	MOV	A,B
+	ORA	C
+	JNZ	BCOPY	; цикл копирования DIRBUF,CSVA,CSVB,ALVA-ALVD
 	LXI	H,DRIVEA
 	LXI	B,16
-	SHLD	DISKI
+	SHLD	DISKI	; =ZAGA b7h
 	DAD	B
-	SHLD	DISKI+2
+	SHLD	DISKI+2	; =ZAGB b7h
 	DAD	B
-	SHLD	DISKI+4
-	CALL	BDSLDS
+	SHLD	DISKI+4	; =ZAGC b7h
+	DAD	B
+	SHLD	DISKI+6	; =ZAGD b7h
+SKCP:	CALL	BDSLDS
 	LXI	H,40H
 	SHLD	6
 	SHLD	9
@@ -127,18 +159,8 @@ COLD02:	PUSH	B
 	LXI	D,M40
 	MVI	B,17
 	XCHG
-	CALL	COPY10
-	RET
-;
-BCOPY:	MOV	A,M
-	STAX	D
-	INX	H
-	INX	D
-	DCX	B
-	MOV	A,B
-	ORA	C
-	JNZ	BCOPY
-	RET
+	JMP	COPY10	; копирование из M40 в 0040h, 17 байт
+;	RET
 ;
 M40:	DI		; (копируется в 0040h)
 	LDA	15
@@ -168,7 +190,7 @@ VCPM:	LXI	H,0
 	STA	M38
 	MVI	M,0C9H
 	LXI	SP,0E000H
-	CALL	CPM0
+	CALL	CPM0	; == 0A006h = 0A011h
 	MOV	C,A
 	DI
 	LDA	M38
@@ -178,15 +200,13 @@ VCPM10:	LXI	SP,0
 ;
 M38:	.DB	0
 WBOOT:	DI
-	LXI	H,0FB00H
+	LXI	H,VIRADR	; 0FB00H адрес virt
 	SHLD	6
 	XRA	A
 	STA	PISAT
 	MVI	A,-1
 	STA	ODISK
 	LDA	4
-;	CMP	3	; макс. номер диска !!!
-;	JNC
 	PUSH	PSW
 	CALL	COM
 	POP	PSW
@@ -218,10 +238,10 @@ FRCOM:	LXI	H,FILE
 ;
 COM00:	LXI	D,5CH
 	MVI	B,12
-	CALL	COPY10
+	CALL	COPY10	; копирование из adr(HL=FILE) в adr(DE=005Ch) B=12 байт
 	XCHG
 	LXI	B,1800H
-	CALL	FILL
+	CALL	FILL	; заполнение памяти значением C с адр(HL) B байт
 	MVI	E,-1
 	MVI	C,32
 	CALL	CPM
@@ -306,14 +326,17 @@ SECTRN:	MOV	H,B
 	RET
 ;
 SELDSK:	LXI	H,0
+	LDA	DISKS	; = количество дисков
+	CMP	C
 	MOV	A,C
-	CPI	3
-	RNC
+	RC		; возврат, если (DISKS < С)
 	STA	DISK
 	CALL	VECT
 DISKI:	.DW	DRIVEA
 	.DW	DRIVEB
 	.DW	DRIVEC
+	.DW	DRIVED
+;
 VECT:	ADD	A
 	POP	H
 	MOV	E,A
@@ -328,7 +351,7 @@ VECT:	ADD	A
 READ:	MVI	D,2	; режим чтения
 	LDA	DISK
 	SUI	2
-	JZ	READ02	; >> переход к чтению с КД
+	JNC	READ02	;JZ	>> переход к чтению с КД
 	MVI	A,-1
 	RP
 	LXI	H,0
@@ -353,9 +376,9 @@ READ10:	LHLD	WRKDMA
 READ11:	XCHG
 	MOV	A,D
 	CPI	09FH
-	JC	READ12
+	JC	READ12	; D < 09Fh
 	CPI	0E0H
-	JC	READ20
+	JC	READ20	; (09Fh <= D < 0E0h) ->>>> чтение через свап
 READ12:	MVI	B,16	;<<< читаем из HL, пишем в DE, 128 байт
 	DI
 	PUSH	H
@@ -403,22 +426,23 @@ READ20:	PUSH	H
 	DI
 	LXI	H,2
 	DAD	SP
-	SHLD	READ22+1
+	SHLD	COPYX+1	; READ22+1
 	POP	H
 	LXI	SP,100H
 	MVI	C,64
 	CALL	80H
-READ22:	LXI	SP,0
-	EI
-	LXI	H,SWAP
-	LXI	D,128
-	MVI	B,128
-	CALL	COPY10
-	RET
+	JMP	COPYX
+;READ22:	LXI	SP,0
+;	EI
+;	LXI	H,SWAP
+;	LXI	D,128
+;	MVI	B,128
+;	CALL	COPY10	; копирование из adr(HL) в adr(DE) B байт
+;	RET
 ;
-SWAPNG:	LXI	H,128
-	LXI	D,VIRT
-	LXI	B,SWAP
+SWAPNG:	LXI	H,128	; берём отсюда
+	LXI	D,VIRD7	; отсюда пишем в adr(HL)
+	LXI	B,SWAP	; сюда сохраняем из adr(HL)
 SWAP10:	MOV	A,M
 	STAX	B
 	LDAX	D
@@ -446,7 +470,7 @@ HDCMP:	MOV	A,H	; возврат Z=0, если DE=HL
 WRITE:	MVI	D,1	; режим записи
 	LDA	DISK
 	SUI	2
-	JZ	WRITKV	; >> переход к записи на КД
+	JNC	WRITKV	; A>=2	>> переход к записи на КД
 	MVI	A,-1
 	RP
 	LXI	H,0
@@ -457,12 +481,13 @@ WRITE:	MVI	D,1	; режим записи
 WRITSP:	LXI	SP,0
 	RET
 ;
-WRITKV:	LDA	TRACK
+WRITKV:	JNZ	WRKV	; если КД11, то пропускаем >>(1)
+	LDA	TRACK	; (защита от записи в системную область КД)
 	CPI	180
-	JC	$+6	; < 180 (1)
+	JC	WRKV	; < 180 >>(1)
 	CPI	196
 	RC		; возврат, если (180 <= ТРЕК < 196)
-	LXI	H,VDMA	; <(1)
+WRKV:	LXI	H,VDMA	; <(1)
 	SHLD	WRKDMA
 	CALL	WRIT10
 	MVI	D,1
@@ -483,12 +508,12 @@ WRIT10:	LHLD	WRKDMA
 	JZ	READ12	; переход, если adr(DMA)=adr(DIRBUF)
 	PUSH	H
 	PUSH	D
-	CALL	SWAPNG	; adr(128-255)-> SWAP, VIRT -> adr(128-255)
+	CALL	SWAPNG	; adr(128-255)-> SWAP, VIRD7 -> adr(128-255)
 	POP	D
 	DI
 	LXI	H,2
 	DAD	SP
-	SHLD	WRIT22+1
+	SHLD	COPYX+1	; WRIT22+1
 	POP	H
 	LXI	SP,100H
 	LXI	B,128
@@ -497,21 +522,22 @@ WRIT10:	LHLD	WRKDMA
 	DAD	B
 	MVI	C,64
 	CALL	83H	;>>> запись в vird7
-WRIT22:	LXI	SP,0
-	EI
-	LXI	H,SWAP
-	LXI	D,128
-	MVI	B,128
-	CALL	COPY10
-	RET
+	JMP	COPYX
+;WRIT22:	LXI	SP,0
+;	EI
+;	LXI	H,SWAP
+;	LXI	D,128
+;	MVI	B,128
+;	CALL	COPY10	; копирование из adr(HL) в adr(DE) B байт
+;	RET
 ;
-B.DWRIT:	PUSH	D
+BDWRIT:	PUSH	D
 	DI
-	CALL	SWAPNG
+	CALL	SWAPNG	; adr(128-255)-> SWAP, VIRD7 -> adr(128-255)
 	LXI	H,0
 	POP	D
 	DAD	SP
-	SHLD	B.DWR10+1
+	SHLD	COPYX+1	; BDWR10+1
 	LXI	H,VRTBUF
 	LXI	B,40
 	DAD	B
@@ -519,37 +545,33 @@ B.DWRIT:	PUSH	D
 	DAD	B
 	XCHG
 	LXI	SP,100H
-	MVI	C,20
-	CALL	83H
-B.DWR10:	LXI	SP,0
-	LXI	H,SWAP
-	LXI	D,128
-	MVI	B,128
-	EI
-	JMP	COPY10
+	MVI	C,20	; счётчик
+	CALL	83H	; >> пишем в SP:=HL (КД) из adr(DE)
+	JMP	COPYX
+;BDWR10:	LXI	SP,0
+;	LXI	H,SWAP	; восстановление adr(128-255)
+;	LXI	D,128
+;	MVI	B,128
+;	EI
+;	JMP	COPY10	; копирование из adr(HL) в adr(DE) B байт
 ;
 BDREAD:	DI
 	PUSH	H
-	CALL	SWAPNG
+	CALL	SWAPNG	; adr(128-255)-> SWAP, VIRD7 -> adr(128-255)
 	POP	D
 	LXI	H,0
 	DAD	SP
-	SHLD	BDRD10+1
+	SHLD	COPYX+1
 	LXI	H,VRTBUF
 	LXI	SP,100H
 	MVI	C,20
-	CALL	80H
-BDRD10:	LXI	SP,0
-	LXI	H,SWAP
+	CALL	80H	; >> пишем в adr(DE) из SP:=HL (КД)
+COPYX:	LXI	SP,0
+	LXI	H,SWAP	; восстановление adr(128-255)
 	LXI	D,128
 	MVI	B,128
 	EI
-	JMP	COPY10
-;
-COPY:	LXI	H,PARAM
-	LXI	D,PARAM0
-	MVI	B,7
-COPY10:	MOV	A,M	; копиование из HL в DE, кол-во байт B 
+COPY10:	MOV	A,M	; копирование из adr(HL) в adr(DE) B байт
 	STAX	D
 	INX	H
 	INX	D
@@ -561,30 +583,26 @@ KVDR:	DCR	D	; 1-запись, 2-чтение
 	MOV	A,D
 	STA	OPER	; 0-запись, 1-чтение
 	PUSH	PSW
-	CALL	COPY
+	LXI	H,PARAM
+	LXI	D,PARAM0
+	MVI	B,7
+	CALL	COPY10	; копирование из adr(PARAM) в adr(PARAM0) B=7 байт
 	CALL	KVRAS	; расчёт адреса сектора на КД
 	POP	PSW
-	JZ	KVWR
+	JZ	KVWR	; >> на запись
 KVRD:	LXI	H,0
 	DI
 	DAD	SP
 	SHLD	KVDR10+1
-	CALL	RDSIX
+	CALL	RDSIX	; (патч для РУ7)
 	LHLD	KADR
 	LXI	B,0FF80h	; =-80h
 	DAD	B	; HL=HL-0080h
-;	MOV	A,L
-;	SUI	80H	; !!! может DAD B ???
-;	MOV	L,A
-;	JNC	$+4	; (1)>
-;	DCR	H
-	SPHL		; <(1)
-	LXI	H,VDMA
+	SPHL
+	LXI	H,VDMA	; куда читать
 	LXI	B,0040h	; B=0 (КС), C=64 (счётчик)
-;	MVI	C,64
-;	MVI	B,0
 KVRD10:	LDA	PORT10
-	JMP	10H	; >>> чтение/запись КД РУ7
+	JMP	10H	; >>> чтение КД РУ7
 KVRD11:	MOV	A,B	; <<< возврат из ПП 0010h
 	MOV	M,E
 	ADD	E
@@ -600,7 +618,7 @@ KVRD11:	MOV	A,B	; <<< возврат из ПП 0010h
 	SHLD	18H
 	LHLD	KCRC	; адрес контрольной суммы
 	SPHL
-	JMP	10H	; >>> чтение/запись КД РУ7
+	JMP	10H	; >>> чтение КД РУ7
 KVR11D:	MOV	A,E	; <<< возврат из ПП 0010h
 	CMP	D
 	JNZ	KVRD12	; > ошибка чтения КС (D<>E)
@@ -610,15 +628,19 @@ KVR11D:	MOV	A,E	; <<< возврат из ПП 0010h
 KVDR09:	MOV	E,B
 	LDA	3FH	; режим обработки ошибок
 	CPI	3	; >=3
-	JNC	KVRD13	; исправление КС по сектору
+	JNC	KVRD13	; исправление КС по сектору (!)
 KVDR10:	LXI	SP,0
-	MVI	A,P10
-	OUT	10H
+	LXI	H,0011h	; 
+	SHLD	11h	; делаем OUT 11h и NOP
+	LXI	H,KVDR11
+	SHLD	18H	; поправляем адрес возврата
+	XRA	A	; отключение КД11
+	JMP	10H	; >>> (nop) КД РУ7
+KVDR11:	LXI	H,SIXBUF; откуда	; <<< возврат из ПП 0010h
+	LXI	D,10H	; куда
+	MVI	B,10	; сколько
+	CALL	COPY10	; восстанавливаем память
 	EI
-	LXI	H,SIXBUF
-	LXI	D,10H
-	MVI	B,10
-	CALL	COPY10
 	MOV	A,C
 	STA	ERROR
 	ANA	A
@@ -636,13 +658,13 @@ KVRD12:	CMP	B	; < ошибка чтения КС
 ;
 KVRD13:	MOV	D,E	; исправление КС
 KVRD14:	LXI	H,KVDR10
-	SHLD	18H
+	SHLD	18H	; правим адрес возврата
 	MVI	A,0D5H	; = PUSH D
 	STA	12H
 	MVI	A,1CH
-	JMP	10H	; >>> чтение/запись КД РУ7
+	JMP	10H	; >>> запись КД РУ7
 ;
-KVWR:	LXI	H,0
+KVWR:	LXI	H,0	; <<<< запись на КД
 	DI
 	DAD	SP
 	SHLD	KVDR10+1
@@ -651,8 +673,6 @@ KVWR:	LXI	H,0
 	LXI	D,128
 	SPHL
 	LXI	B,0040h	; B=0 (КС), C=64 (счётчик)
-;	MVI	C,64
-;	MVI	B,0
 	LXI	H,VDMA
 	DAD	D
 KVWR10:	DCX	H
@@ -662,9 +682,9 @@ KVWR10:	DCX	H
 	DCX	H
 	MOV	E,M
 	ADD	E
-	MOV	B,A
+	MOV	B,A	; B= КС
 	LDA	PORT10
-	JMP	10H	; >>> чтение/запись КД РУ7
+	JMP	10H	; >>> запись КД РУ7
 KVWR11:	DCR	C	; <<< возврат из ПП 10h
 	JNZ	KVWR10	; цикл записи сектора
 	LHLD	KCRC	; адрес контрольной суммы
@@ -675,7 +695,7 @@ KVWR11:	DCR	C	; <<< возврат из ПП 10h
 	MOV	E,B
 	JMP	KVRD14	; >> запись КС
 ;
-RDSIX:	LXI	H,RDRU7
+RDSIX:	LXI	H,RDRU7	; часть патча для РУ7 (и КД11)
 RDSIX0: LXI	D,10H
 	LXI	B,SIXBUF
 	MVI	A,10
@@ -690,18 +710,23 @@ SIXC10:	PUSH	PSW
 	POP	PSW
 	DCR	A
 	JNZ	SIXC10
+	LDA	DISK	; проверка на КД11
+	CPI	2
+	RZ		; =КД10, пропускаем настройку на КД11
+	MVI	A,11h	; тут правим ПП по адресу 10h на КД11
+	STA	0011h
 	RET
 ;
 WRSIX:	LXI	H,WRRU7
 	JMP	RDSIX0
 ;
-RDRU7:	OUT	10H
+RDRU7:	OUT	10H	; (менять на 11h)
 	POP	D
 	MVI	A,P10	; = 20h
 	OUT	10H
 	JMP	KVRD11
 ;
-WRRU7:	OUT	10H
+WRRU7:	OUT	10H	; (менять на 11h)
 	PUSH	D
 	MVI	A,P10	; = 20h
 	OUT	10H
@@ -724,7 +749,7 @@ KVRAS:	LDA	TRC0	; <<< расчёт адреса сектора на КД
 	RRC
 	RRC
 	MOV	H,A
-	ANI	0CH
+	ANI	0CH	; =00001100b
 	ORI	10H
 	MOV	B,A
 	MOV	A,H
@@ -774,7 +799,10 @@ DRIV20:	DCR	D
 	MOV	A,D
 	STA	OPER
 	PUSH	PSW
-	CALL	COPY
+	LXI	H,PARAM	; откуда
+	LXI	D,PARAM0	; куда
+	MVI	B,7	; сколько
+	CALL	COPY10	; копируем
 	LXI	H,SECT0
 	DCR	M
 	MOV	A,M
@@ -1186,22 +1214,22 @@ NBDS00:	MOV	A,M
 	JZ	NBDS10
 	CMP	C
 	INX	H
-	JNZ	NBDS00
+	JNZ	NBDS00	; цикл
 	MOV	A,D
 	CPI	9FH
-	JC	CPM
+	JC	CPM	; >> D < 9Fh
 	CPI	0E0H
-	JNC	CPM
+	JNC	CPM	; >> D => E0h
 	PUSH	D
 	PUSH	B
-	CALL	B.DWRIT
-	LXI	D,VRTBUF
+	CALL	BDWRIT	; >> запись на КД через vird7
+	LXI	D,VRTBUF	; исп. как буфер командной строки???
 	POP	B
 	CALL	CPM
 	XTHL
 	PUSH	D
 	PUSH	PSW
-	CALL	BDREAD
+	CALL	BDREAD	; >> чтение с КД через vird7
 	POP	PSW
 	POP	D
 	POP	H
@@ -1244,9 +1272,9 @@ CHKDSK:	MVI	C,29
 	JMP	BDREST
 ;
 SCOM:	LXI	H,ACOMBF
-	XCHG
-	MVI	B,12
-	CALL	COPY10
+	XCHG		; DE= куда, HL= откуда
+	MVI	B,12	; сколько
+	CALL	COPY10	; кипируем
 	MVI	A,-1
 	STA	FACOM
 	RET
@@ -1335,12 +1363,12 @@ CINP:	LDAX	D
 	STAX	D
 CINP02:	LXI	H,CINPBF
 	PUSH	H
-	XCHG
-	MVI	B,12
-	CALL	COPY10
+	XCHG		; DE= куда, HL= откуда
+	MVI	B,12	; сколько
+	CALL	COPY10	; копируем
 	XCHG
 	LXI	B,1800H
-	CALL	FILL
+	CALL	FILL	; заполнение памяти значением C с адр(HL) B байт
 	POP	D
 	MVI	C,15
 	CALL	CPM
@@ -1372,16 +1400,16 @@ IBAT:	LDAX	D
 	STAX	D
 IBAT02:	LXI	H,BATBF
 	PUSH	H
-	XCHG
-	MVI	B,12
-	CALL	COPY10
+	XCHG		; DE= куда, HL= откуда
+	MVI	B,12	; сколько
+	CALL	COPY10	; копируем
 	XCHG
 	LXI	B,1800H
-	CALL	FILL
-	LXI	H,80H
-	LXI	D,BATPAR
-	MVI	B,128
-	CALL	COPY10
+	CALL	FILL	; заполнение памяти значением C с адр(HL) B байт
+	LXI	H,80H	; откуда
+	LXI	D,BATPAR	; куда
+	MVI	B,128	; сколько
+	CALL	COPY10	; копируем
 	POP	D
 	MVI	C,15
 	CALL	CPM
@@ -1400,10 +1428,10 @@ IBAT04:	XRA	A
 IBAT10:	XRA	A
 	RET
 ;
-FBAT:	LXI	H,80H
-	LXI	D,BATDMA
-	MVI	B,128
-	CALL	COPY10
+FBAT:	LXI	H,80H	; откуда
+	LXI	D,BATDMA	; куда
+	MVI	B,128	; сколько
+	CALL	COPY10	; копируем
 	JMP	IBAT04
 ;
 COUT:	LDAX	D
@@ -1417,12 +1445,12 @@ COUT:	LDAX	D
 	STAX	D
 COUT02:	LXI	H,COUTBF
 	PUSH	H
-	XCHG
-	MVI	B,12
-	CALL	COPY10
+	XCHG		; DE= куда, HL= откуда
+	MVI	B,12	; сколько
+	CALL	COPY10	; копируем
 	XCHG
 	LXI	B,1800H
-	CALL	FILL
+	CALL	FILL	; заполнение памяти значением C с адр(HL) B байт
 	POP	D
 	MVI	C,15
 	CALL	CPM
@@ -1436,7 +1464,7 @@ COUT02:	LXI	H,COUTBF
 	RZ
 	LXI	H,COUDMA
 	LXI	B,801AH
-	CALL	FILL
+	CALL	FILL	; заполнение памяти значением C с адр(HL) B байт
 	XRA	A
 	STA	COUSCN
 	DCR	A
@@ -1585,10 +1613,10 @@ ACCE20:	XCHG
 	MVI	C,20
 	CALL	CPM
 	POP	D
-	LXI	H,DIRBUF
+	LXI	H,DIRBUF	; DE= куда, HL= откуда
 	PUSH	PSW
-	MVI	B,128
-	CALL	COPY10
+	MVI	B,128	; сколько
+	CALL	COPY10	; копируем
 	POP	PSW
 	ANA	A
 ACCE21:	POP	H
@@ -1603,9 +1631,9 @@ ACCE22:	PUSH	D
 	PUSH	B
 	LXI	H,DIRBUF
 	PUSH	H
-	XCHG
-	MVI	B,128
-	CALL	COPY10
+	XCHG		; DE= куда, HL= откуда
+	MVI	B,128	; сколько
+	CALL	COPY10	; копируем
 	POP	D
 	MVI	C,1AH
 	CALL	CPM
@@ -1615,7 +1643,7 @@ ACCE22:	PUSH	D
 	POP	H
 	PUSH	PSW
 	LXI	B,801AH
-	CALL	FILL
+	CALL	FILL	; заполнение памяти значением C с адр(HL) B байт
 	POP	PSW
 	ANA	A
 	JMP	ACCE21
@@ -1627,7 +1655,7 @@ HLA:	ADD	L
 	RET
 ;
 ; тестирование КД: вход DE
-; D= номер диска; E= Х-тест, 1-восстановить КС, 2-форматирование
+; D= номер диска; E= Х-тест, 1-восстановить КС, 2-форматирование (пока нет)
 TEST:	LDA	3FH	; режим обработки ошибок
 	PUSH	PSW
 	MVI	A,2
@@ -1640,6 +1668,11 @@ TST0:	STA	3FH	; режим обработки ошибок
 	PUSH	D
 	CALL	SELDSK
 	POP	D
+	CPI	2
+	JC	TSTOK	; D<2  >>> неправильный диск
+	MOV	A,H
+	ORA	L
+	JZ	TSTOK	; HL=0 >>> неправильный диск
 	LXI	B,000Ah
 	DAD	B	; HL = ссылка на пареметры диска (DRIVEC)
 	MOV	A,M
@@ -1693,24 +1726,27 @@ STRTS:;	.DB 10,"ОШИБКА КВАЗИДИСКА -",0
 	.DB ",фяЄяЎыс -",0,",єхыЇяЄ -",0
 ;	.DB " -ИСПРАВЛЕНО",0
 	.DB " -щєЁЄсўьхюя",0
+;
 ZAGA:	.DW 0,0,0,0,DIRBUF,PARA,CSVA,ALVA
 ZAGB:	.DW 0,0,0,0,DIRBUF,PARB,CSVB,ALVB
 ZAGC:	.DW 0,0,0,0,DIRBUF,PARC,0,ALVC
-PARA:	.DW 40
-	.DB 4,15,0
-	.DW 187H,127,0C0H,32,8
-PARB:	.DW 40
-	.DB 4,15,0
-	.DW 187H,127,0C0H,32,8
-PARC:	.DW 8			; ещё одна таблица в virt.asm, строка 183
-	.DB 3,7,0
-	.DW 235,63,0C0H,0,0	; 219...
-DIRBUF:	.DS	128	; <=
-CSVA:	.DS	32	; <=
-CSVB:	.DS	32	; <=
-ALVA:	.DS	51	; <=
-ALVB:	.DS	51	; <=
-ALVC:	.DS	33	; <=
+ZAGD:	.DW 0,0,0,0,DIRBUF,PARD,0,ALVD
+;PARA:	.DW 40			; перенесено в virt.asm
+;	.DB 4,15,0
+;	.DW 187H,127,0C0H,32,8
+;PARB:	.DW 40
+;	.DB 4,15,0
+;	.DW 187H,127,0C0H,32,8
+;PARC:	.DW 8
+;	.DB 3,7,0
+;	.DW 235,63,0C0H,0,0	; было 219...
+;DIRBUF:	.DS	128	; <=
+;CSVA:	.DS	32	; <=
+;CSVB:	.DS	32	; <=
+;ALVA:	.DS	51	; <=
+;ALVB:	.DS	51	; <=
+;ALVC:	.DS	33	; <=
+;
 TTRC:	.DB 0,0
 PARAM0:	.DS	7	; <=
 PARAM:	.DS	7	; <=
@@ -1733,6 +1769,7 @@ SECT0:	.EQU	PARAM0+4
 DRIVEA:	.EQU	ZAGA
 DRIVEB:	.EQU	ZAGB
 DRIVEC:	.EQU	ZAGC
+DRIVED:	.EQU	ZAGD
 DMA0:	.EQU	PARAM0+5
 VRTBUF:	.DS	40	; <=
 OSECT0:	.DB	0
@@ -1791,7 +1828,7 @@ USED14:	POP	H
 	XCHG
 	RET
 ;
-FILL:	MOV	M,C
+FILL:	MOV	M,C	; заполнение памяти значением C с адр(HL) B байт
 	INX	H
 	DCR	B
 	JNZ	FILL
@@ -2033,6 +2070,7 @@ ADA02:	MOV	B,A	; В = код ошибки
 	OUT	05FH	; Системный сброс (лучше не пользоваться, сходство с 57Н без обнуления микросхем жесткого диска).
 ADA15:	STA	ERROR
 	JMP	FSWR20	; На обработку ошибки
-	.org 0BFBFh	; выравнивание размера
+;
+	.org 0BFFFh	; выравнивание размера
 	.db 0
 	.END
