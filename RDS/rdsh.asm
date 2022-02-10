@@ -1,8 +1,7 @@
 ;(перед компилированием преобразовать в CP866)
 	.ORG	100H
 ;#DEFINE NoPACK
-	LXI	SP,80H
-	JMP	START
+STDISP:	.EQU	0CA00H
 SELDSK:	.EQU	0FB1BH
 SETTRK:	.EQU	0FB1EH
 SETSEC:	.EQU	0FB21H
@@ -10,39 +9,27 @@ SETDMA:	.EQU	0FB24H
 WRITE:	.EQU	0FB2AH
 READ:	.EQU	0FB27H
 ;OS:	.EQU	400H
-STRA:	.EQU	OS+60H
-COM:	.EQU	OS+100H
-RDS:	.EQU	COM+2818	; << + размер файла ccph.obj
-STR0:	.DB 12,27,'/',27,'b'
-;	.DB "(c) Резидентная Дисковая Систем"
-	.DB "(c) Є┼┌╔─┼╬╘╬┴╤ ф╔╙╦╧╫┴╤ є╔╙╘┼═"
-;	.DB "а.              Версия 3.05 "
-	.DB "┴.              ў┼╥╙╔╤ 3.05 "
-	.DB 10
-;	.DB "(c) Вьюнов В.А.   Copyright (c)"
-	.DB "(c) ў╪└╬╧╫ ў.с.   Copyright (c)"
-	.DB " 1994-1997 by Vitaly Vewnov."
-	.DB 10
-;	.DB " Марта 24 числа 1997г. от Р.Х."
-	.DB " э┴╥╘┴ 24 ▐╔╙╠┴ 1997╟. ╧╘ Є.ш."
-	.DB 10,27,'a'
-;	.DB "Модификация 04.06.2021г., Impro"
-	.DB "э╧─╔╞╔╦┴├╔╤ 04.06.2021╟., Impro"
-	.DB "ver",10,'$'
-STR1:;	.DB 10,"Квази-диск отформатирован.$"
-	.DB 10,"ы╫┴┌╔-─╔╙╦ ╧╘╞╧╥═┴╘╔╥╧╫┴╬.$"
-STR2:;	.DB 10,"Форматирование диска C:.$"
-	.DB 10,"ц╧╥═┴╘╔╥╧╫┴╬╔┼ ─╔╙╦┴ C:.$"
-STRHDD:;.DB 10,"Инициализация HDD...$"
-	.DB 10,"щ╬╔├╔┴╠╔┌┴├╔╤ HDD...$"
-STRHDE:;.DB 10,"Ошибка !$"
-	.DB 10,"я█╔┬╦┴ !$"
+TDSK:	.EQU	OS+38h		; ПП проверки наличия КД11
+DISKS:	.EQU	0AE46H		; количество дисковых устройств -1
+STRA:	.EQU	OS+60h		; ссылка на надпись в загрузчике
+DMARK:	.EQU	STRA+62h
+PACK:	.EQU	OS+100h
+LCOM:	.EQU	0B80h		; размер файла ccph.obj
+#ifdef NoPACK
+RDS:	.EQU	PACK+LCOM	; << начало блока + размер файла ccph.obj
+COM:	.EQU	PACK
+#else
+RDS:	.EQU	PACK		;
+COM:	.EQU	0A000H-LCOM	; туда будут распакованы данные
+#endif
+	LXI	SP,80H
+;;	JMP	START
 START:	DI
 	MVI	A,20H		; 0010 0000 -- банк 3 как ОЗУ A000-DFFFh
 	OUT	10H
 	LXI	H,RDS		; откуда
-	LXI	D,0A000H	; куда
 #ifdef NoPACK
+	LXI	D,0A000H	; куда
 BEGIN:	MOV	A,M
 	STAX	D
 	INX	H
@@ -51,9 +38,10 @@ BEGIN:	MOV	A,M
 	CPI	0E0H
 	JC	BEGIN		; цикл до адреса E000h
 #else
+	LXI	D,0A000H-LCOM	; куда
 	CALL	unlzsa1		; распаковка
 #endif
-	CALL	0CA00H
+	CALL	STDISP		; (0CA00H)
 	LXI	H,0E4F2h	; ='РД'
 	SHLD	11
 	LXI	H,30F3H		; ='С' 3.0
@@ -63,7 +51,6 @@ BEGIN:	MOV	A,M
 	LXI	D,STR0
 	MVI	C,9
 	CALL	5
-; <<+++ тест на 2 КД
 	IN	1
 	ANI	40H
 	JNZ	EXIT	; >>> переход, если не нажата УС
@@ -146,7 +133,9 @@ REP12:	PUSH	D
 	CALL	SAVE	; сохр.файла OS.COM / RDS.COM
 	MVI	A,23	; сколько секторов (по 128 байт)
 	STA	WSECT
+
 	LXI	H,COM	; откуда
+
 	SHLD	DMA
 	LXI	H,FILE1
 	CALL	SAVE	; сохр.файла COMMAND.SYS
@@ -155,7 +144,7 @@ REP12:	PUSH	D
 SRDS:	MVI	A,0	; сколько секторов (по 128 байт)
 	STA	WSECT
 	LXI	H,FILE2
-	CALL	SAVE	; сохр.файла RDS.SYS
+	CALL	SAVE	; создание файла RDS.SYS
 ; исправление записи файла
 	LXI	B,80H
 	CALL	SETDMA
@@ -163,24 +152,30 @@ SRDS:	MVI	A,0	; сколько секторов (по 128 байт)
 ;	CALL	SELDSK
 	MVI	C,0	; трек 0
 	CALL	SETTRK
-	CALL	FIND	; поиск записи
+	CALL	FIND	; поиск записи (с исправлением)
 	JNZ	SKP1	; найдено -- пропускаем трек 1
 	MVI	C,1	; трек 1
 	CALL	SETTRK
-	CALL	FIND	; поиск записи
+	CALL	FIND	; поиск записи (с исправлением)
 	JZ	SRDS	; не нашли????
 SKP1:	CALL	WRITE	; сохраняем каталог
 ;
-	CALL	INIHDD	;<<<
+	CALL	TDSK	; тест наличия КД11
+	STA	DISKS	; сохраняем количество устройств
+	CPI	3
+	JZ	SKP2
+	MVI  A, 20h	; =" "
+	STA	DMARK	; затираем букву "D"
+SKP2:	CALL	INIHDD	;<<<
 	MVI	C,13	; сброс дисков
 	CALL	5
 	MVI	E,10	; <ПС>
 	MVI	C,2
 	CALL	5
-	LXI	D,STRA+1	; надпись РДС в прямоугольнике
+	LXI	D,STRA	; надпись РДС в прямоугольнике
 	MVI	C,9
 	CALL	5
-	JMP	0
+	JMP	0	; >>>>>>>>>>>>>>>>> запуск системы
 ;
 INIHDD:	LXI	D,STRHDD	;"Инициализация HDD...$"
 	MVI	C,9
@@ -302,7 +297,7 @@ F_LOOP:	STA	WSECT
 	LXI	D,0020h	; шаг
 FL_1:	MOV	A,M
 	CPI	0E5h
-	CNZ	L_NAME	; проверка найденой записи
+	CNZ	L_NAME	; проверка найденой записи (с исправлением)
 	RNZ		; >> нашли, что надо
 	DAD	D
 	XRA	A
@@ -483,4 +478,28 @@ ManyLiterals:
 	mov b,m
 	jmp CopyLiterals_UseC
 #endif
+STR0:	.DB 12,27,'/',27,'b'
+;	.DB "(c) Резидентная Дисковая Систем"
+	.DB "(c) Є┼┌╔─┼╬╘╬┴╤ ф╔╙╦╧╫┴╤ є╔╙╘┼═"
+;	.DB "а.              Версия 3.06 "
+	.DB "┴.              ў┼╥╙╔╤ 3.06 "
+	.DB 10
+;	.DB "(c) Вьюнов В.А.   Copyright (c)"
+	.DB "(c) ў╪└╬╧╫ ў.с.   Copyright (c)"
+	.DB " 1994-1997 by Vitaly Vewnov."
+	.DB 10
+;	.DB " Марта 24 числа 1997г. от Р.Х."
+	.DB " э┴╥╘┴ 24 ▐╔╙╠┴ 1997╟. ╧╘ Є.ш."
+	.DB 10,27,'a'
+;	.DB "Модификация 08.02.2022г., Impro"
+	.DB "э╧─╔╞╔╦┴├╔╤ 08.02.2022╟., Impro"
+	.DB "ver",10,'$'
+STR1:;	.DB 10,"Квази-диск отформатирован.$"
+	.DB 10,"ы╫┴┌╔-─╔╙╦ ╧╘╞╧╥═┴╘╔╥╧╫┴╬.$"
+STR2:;	.DB 10,"Форматирование диска C:.$"
+	.DB 10,"ц╧╥═┴╘╔╥╧╫┴╬╔┼ ─╔╙╦┴ C:.$"
+STRHDD:;.DB 10,"Инициализация HDD...$"
+	.DB 10,"щ╬╔├╔┴╠╔┌┴├╔╤ HDD...$"
+STRHDE:;.DB 10,"Ошибка !$"
+	.DB 10,"я█╔┬╦┴ !$"
 OS:	.END
