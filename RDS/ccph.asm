@@ -665,13 +665,14 @@ TEST:	CALL	DECOD
 ;	LXI	H,CBUF+1
 	LDA	UDISK	; номер диска в командной строке
 	DCR	A
-	JP	TST01	; >> A>FFh
+	JP	TST01	; >> A<>FFh
 	MVI	A,2
-TST01:	CPI	2
-	JNZ	BADCOM	; >> не С: (потом добавить второй КД)!!!
-	MOV	D,A	; D= номер диска [C:=2]
+TST01:	MOV	D,A	; D= номер диска
+	CPI	2
+	JC	BADCOM	; >> переход, если A<2 (C:--)
+	CPI     4
+	JNC	BADCOM	; >> переход, если A>=4 (E:++)
 	MVI	E,02h	; E= Х-тест, 1-восстановить КС, 2-форматирование
-;	MOV	A,M
 	LDA	CBUF+1	; первый символ параметров
 	CPI	'F'
 	JZ	TST02	; >> форматирование
@@ -1216,4 +1217,7 @@ TDISK:	.DB	0
 UDISK:	.DB	0
 TF9F1:	.DB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 TFA00:	.DW 0,0,0
+;
+	.org 0FAFFh	; выравнивание размера
+	.DB 0
 	.END
