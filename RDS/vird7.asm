@@ -38,6 +38,4 @@ WRIT10:	LDA	3CH
 	RET
 	.ORG 00FEh
 SBUF:	.DW 0		; << стек, адрес возврата из vird7
-	.org 027Fh	; выравнивание размера
-	.db 0
 	.END
