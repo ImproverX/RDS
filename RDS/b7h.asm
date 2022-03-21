@@ -1,10 +1,9 @@
-;(перед компилированием преобразовать в CP866)
 	.ORG	0AE00H
-ZAPL:	.EQU	0D380H	;DISP !
-ZAPL2:	.EQU	0BF80h	;было 0C000H	;+++++++++++ b7h
+ZAPL:	.EQU	0D800H	;DISP !
+ZAPL2:	.EQU	0D880h	;было 0C000H	;+++++++++++ b7h
 BDSLDS:	.EQU	0AC2DH	;== .dw AAC21 bdos.asm
 CURDSK:	.EQU	0A34EH	;== .dw DA342 bdos.asm
-DRIVSP:	.EQU	0C000H	;+++++++++++ b7h DF70h
+DRIVSP:	.EQU	0DEE0H	;+++++++++++ b7h DF70h
 BDPRNT:	.EQU	0A18AH	;== .dw AA190 bdos.asm
 BDDAT:	.EQU	0ADBDH	;== .dw DADB1 bdos.asm
 BDDAT2:	.EQU	0ADC5H	;== .dw DADB9 bdos.asm
@@ -19,17 +18,18 @@ INBYT:	.EQU	0CA06H
 OUTBYT:	.EQU	0CA0CH
 LST:	.EQU	0CA0FH
 RDMA:	.EQU	0D900H	; (L должно быть =0)
-VDMA:	.EQU	0DE80H	; 128 байт
-VIRD7:	.EQU	0DE00H
+VDMA:	.EQU	0DE00H	; 128 байт
+VIRD7:	.EQU	0BF80H
 BATPAR:	.EQU	0DD00H
 SWAP:	.EQU	0DD80H	; буфер для свапа ПП при чтении данных в адреса 9F00-E000
-P10:	.EQU	20H
-CPM:	.EQU	0A011H	;== AA011 bdos.asm
-CPM0:	.EQU	0A006H	;== 0A006h bdos, там JMP AA011
+P10:	.EQU	20H	; 0010 0000b -- банк 3 как ОЗУ A000-DFFFh
+CPM:	.EQU	0A011H	;== AA011 bdos
+CPM0:	.EQU	0A006H	;== 0A006h bdos
+AAD56:	.EQU	0AD62h	;== AAD56 bdos
 ;
 VIRADR:	.EQU	0FB00h	;== адрес начала virt
-VIRSRC:	.EQU	0D400H	;== адрес хранения virt
-VPAR:	.EQU	0FDBFh	;== PARA (virt)
+VIRSRC:	.EQU	0D380H	;== адрес хранения virt
+VPAR:	.EQU	0FDBCh	;== PARA (virt)
 PARA:	.EQU	VPAR-VIRADR+VIRSRC	; == адрес хранения PARA virt
 PARB:	.EQU	PARA+15
 PARC:	.EQU	PARB+15
@@ -79,8 +79,8 @@ BDREST:	LDA	CURDSK
 	MOV	C,A
 	LXI	H,1
 	CALL	BDRS10
-	CALL	0AD56H
-	JMP	0AC21H
+	CALL	AAD56	; >> bdos
+	JMP	BDSLDS	; >> bdos
 ;
 BDRS10:	INR	C
 	DCR	C
@@ -1106,9 +1106,9 @@ FSSC10:	XRA	A
 	RET
 ;
 PRINTH:	MOV	A,H
-	CALL	0CA15H
+	CALL	HEXOUT
 	MOV	A,L
-	JMP	0CA15H
+	JMP	HEXOUT
 ;
 ASK:	CALL	PRINT
 	LXI	H,STRSE0
@@ -1756,8 +1756,8 @@ OOPER:	.DB	1
 OSECT:	.DB	-1
 RSECT:	.DB	-1
 PISAT:	.DB	0
-DISK:	.EQU	PARAM
 ERROR:	.EQU	3DH
+DISK:	.EQU	PARAM
 OPER:	.EQU	PARAM+2
 TRACK:	.EQU	PARAM+3
 SECT:	.EQU	PARAM+4
@@ -1766,11 +1766,11 @@ DISK0:	.EQU	PARAM0
 OPER0:	.EQU	PARAM0+2
 TRC0:	.EQU	PARAM0+3
 SECT0:	.EQU	PARAM0+4
+DMA0:	.EQU	PARAM0+5
 DRIVEA:	.EQU	ZAGA
 DRIVEB:	.EQU	ZAGB
 DRIVEC:	.EQU	ZAGC
 DRIVED:	.EQU	ZAGD
-DMA0:	.EQU	PARAM0+5
 VRTBUF:	.DS	40	; <=
 OSECT0:	.DB	0
 WRKDMA:	.DW	0
@@ -2071,6 +2071,6 @@ ADA02:	MOV	B,A	; В = код ошибки
 ADA15:	STA	ERROR
 	JMP	FSWR20	; На обработку ошибки
 ;
-	.org 0BFFFh	; выравнивание размера
+	.org 0BF7Fh	; выравнивание размера
 	.db 0
 	.END
