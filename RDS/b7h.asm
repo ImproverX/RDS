@@ -65,7 +65,7 @@ CBIOS:
 	JMP	BDSEAR	; +38
 	JMP	BDREST	; +3B
 	JMP	NBDOS	; +3E
-	.DW	HDDAT	; +41
+	.DW	HDDAT+1	; +41 -- адрес для сохранения (10000h - (число дискет))
 TYPEWR:	.DB	0	; +43
 FTRACK:	.DB	0	; +44
 WOPER:	.DB	0	; +45
@@ -1861,14 +1861,13 @@ BATBF:	.DS	36	; <=
 BATDMA:	.DS	128	; <=
 HDDA:	.DB	1,0,2,0,0
 HDDB:	.DB	0,0,0,0,0
-HDDAT:	.DW	APAR2+1	; -- адрес для сохранения (10000h - (число дискет))
 ;
 SETHDD:	LDA	4
 	CPI	2
 	MOV	C,A
 	MVI	A,0FFH
 	RNC
-APAR2:	LXI	H,-1	; <= значение меняется из RDSH  -- (10000h - (число дискет))
+HDDAT:	LXI	H,-1	; <= значение меняется из RDSH  -- (10000h - (число дискет))
 	DAD	D
 	RC
 	LXI	H,HDDB
@@ -1902,7 +1901,7 @@ SETH10:	LXI	B,1570	; = 0622h -- суммарное количество сект
 	XRA	A
 	RET
 ;
-GETHDD:	LHLD	APAR2+1
+GETHDD:	LHLD	HDDAT+1
 	CALL	NEGHL
 	DCX	H
 	PUSH	H
