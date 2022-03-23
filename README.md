@@ -16,8 +16,8 @@
 |:------------------|:------------|
 | ccph              |(A000h-0B80h)..8FFFh|
 | bdos              |A000h..ADFFh|
-| bios (b7h)        |AE00h..BE5Bh|
-| _(нули)_          |BE5Ch..BF7Fh|
+| bios (b7h)        |AE00h..BE58h|
+| _(нули)_          |BE59h..BF7Fh|
 | vird7             |BF80h..DFFFh|
 | шрифт             |C000h..C9FFh|
 | disp              |CA00h..D301h|
