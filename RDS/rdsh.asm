@@ -220,17 +220,17 @@ INIH12:	DI		; занесение характеристик НЖМД в БСВВ
 	STA	3FH
 	MVI	A,20H	; 0010 0000b -- банк 3 как ОЗУ A000-DFFFh
 	OUT	10H
-	LHLD	0A000H
+	LHLD	0A000H	; HL = 0AE00h
 	LXI	D,41H
 	DAD	D
 	MOV	E,M
 	INX	H
-	MOV	D,M	; DE = HDDAT (BIOS)
-	XCHG
-	MOV	E,M
-	INX	H
-	MOV	D,M
-	XCHG		; HL = APAR2+1 (BIOS)
+	MOV	D,M	; DE = HDDAT+1 (BIOS)
+;	XCHG
+;	MOV	E,M
+;	INX	H
+;	MOV	D,M
+	XCHG		; HL = HDDAT+1 (BIOS)
 	SHLD	APAR2+1
 	LHLD	84H	; -- количество дискет
 	MOV	A,H
@@ -240,7 +240,7 @@ INIH12:	DI		; занесение характеристик НЖМД в БСВВ
 	CMA
 	MOV	L,A
 	INX	H
-APAR2:	SHLD	0	; => APAR2+1 (BIOS) -- (10000h - (число дискет))
+APAR2:	SHLD	0	; => HDDAT+1 (BIOS) = (10000h - (число дискет))
 	MVI	A,23H	; 0010 0011b -- банк 0 как ОЗУ A000-DFFFh
 	OUT	10H
 	EI
