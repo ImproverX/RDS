@@ -1,31 +1,23 @@
 	.ORG	0AE00H
+INITCN:	.EQU	DISP	; = 0CA00H
+KEY:	.EQU	DISP+3	; = 0CA03H
+INBYT:	.EQU	DISP+6	; = 0CA06H
+PRINTC:	.EQU	DISP+9	; = 0CA09H
+OUTBYT:	.EQU	DISP+12	; = 0CA0CH
+LST:	.EQU	DISP+15	; = 0CA0FH
+KEYS:	.EQU	DISP+18	; = 0CA12H
+HEXOUT:	.EQU	DISP+21	; = 0CA15H
+PRINT:	.EQU	DISP+24	; = 0CA18H
+;
+VIRD7:	.EQU	0BF80H	;== адрес хранения vird7
 ZAPL:	.EQU	0D800H	;DISP !
 ZAPL2:	.EQU	0D880h	;было 0C000H	;+++++++++++ b7h
-BDSLDS:	.EQU	0AC2DH	;== .dw AAC21 bdos.asm
-CURDSK:	.EQU	0A34EH	;== .dw DA342 bdos.asm
-DRIVSP:	.EQU	0DEE0H	;+++++++++++ b7h DF70h
-BDPRNT:	.EQU	0A18AH	;== .dw AA190 bdos.asm
-BDDAT:	.EQU	0ADBDH	;== .dw DADB1 bdos.asm
-BDDAT2:	.EQU	0ADC5H	;== .dw DADB9 bdos.asm
-BDDAT3:	.EQU	0ADE5H	;== .dw DADD9 bdos.asm
-INITCN:	.EQU	0CA00H
-PRINT:	.EQU	0CA18H
-KEYS:	.EQU	0CA12H
-KEY:	.EQU	0CA03H
-PRINTC:	.EQU	0CA09H
-HEXOUT:	.EQU	0CA15H
-INBYT:	.EQU	0CA06H
-OUTBYT:	.EQU	0CA0CH
-LST:	.EQU	0CA0FH
-RDMA:	.EQU	0D900H	; (L должно быть =0)
-VDMA:	.EQU	0DE00H	; 128 байт
-VIRD7:	.EQU	0BF80H
-BATPAR:	.EQU	0DD00H
+RDMA:	.EQU	0D900H	; (L должно быть =0) размер 1024 байта
+BATPAR:	.EQU	0DD00H	; = VRTMOV
 SWAP:	.EQU	0DD80H	; буфер для свапа ПП при чтении данных в адреса 9F00-E000
+VDMA:	.EQU	0DE00H	; 128 байт
+DRIVSP:	.EQU	0DEE0H	;+++++++++++ b7h DF70h
 P10:	.EQU	20H	; 0010 0000b -- банк 3 как ОЗУ A000-DFFFh
-CPM:	.EQU	0A011H	;== AA011 bdos
-CPM0:	.EQU	0A006H	;== 0A006h bdos
-AAD56:	.EQU	0AD62h	;== AAD56 bdos
 ;
 VIRADR:	.EQU	0FB00h	;== адрес начала virt
 VIRSRC:	.EQU	0D380H	;== адрес хранения virt
@@ -41,6 +33,17 @@ ALVA:	.EQU	CSVB+32
 ALVB:	.EQU	ALVA+51
 ALVC:	.EQU	ALVB+51
 ALVD:	.EQU	ALVC+33
+;
+; обращения к bdos:
+;BDSLDS:	.EQU	AAC21
+;CURDSK:	.EQU	DA342
+;BDPRNT:	.EQU	AA190
+;BDDAT:		.EQU	DADB1
+;BDDAT2:	.EQU	DADB9
+;BDDAT3:	.EQU	DADD9
+;CPM:		.EQU	AA011
+;CPM0:		.EQU	AA006
+;AAD56:		.EQU	AAD56
 ;
 CBIOS:
 	JMP	COLD	; +0
@@ -66,7 +69,7 @@ CBIOS:
 	JMP	BDREST	; +3B
 	JMP	NBDOS	; +3E
 	.DW	HDDAT+1	; +41 -- адрес для сохранения (10000h - (число дискет))
-TYPEWR:	.DB	0	; +43
+TYPEWR:	.DB	0	; +43 -- тип записываемого сектора (см.WRITE)
 FTRACK:	.DB	0	; +44
 WOPER:	.DB	0	; +45
 DISKS:	.DB	3	; +46 -- количество дисковых устройств -1
@@ -80,7 +83,7 @@ BDREST:	LDA	CURDSK
 	LXI	H,1
 	CALL	BDRS10
 	CALL	AAD56	; >> bdos
-	JMP	BDSLDS	; >> bdos
+	JMP	BDSLDS	; (AAC21) >> bdos
 ;
 BDRS10:	INR	C
 	DCR	C
@@ -302,9 +305,11 @@ PUTCH:	MOV	A,C
 READER:	MOV	A,C
 	JMP	INBYT
 ;
-HOME:	MVI	C,0
+HOME:	LXI	B,0
 SETTRC:	LXI	H,TRACK
 	MOV	M,C
+	INX	H
+	MOV	M,B
 	RET
 ;
 SETSEC:	LXI	H,SECT
@@ -325,7 +330,13 @@ SECTRN:	MOV	H,B
 	MOV	L,C
 	RET
 ;
-SELDSK:	LXI	H,0
+SETDSK:	STA	DISK
+	RET
+;
+SELDSK:	MOV	A,C
+	CPI	0F0h
+	JNC	SETDSK	; >> обращение к НЖМД в LBA
+	LXI	H,0
 	LDA	DISKS	; = количество дисков
 	CMP	C
 	MOV	A,C
@@ -348,19 +359,33 @@ VECT:	ADD	A
 	MOV	L,E
 	RET
 ;
-READ:	MVI	D,2	; режим чтения
-	LDA	DISK
-	SUI	2
-	JNC	READ02	;JZ	>> переход к чтению с КД
-	MVI	A,-1
-	RP
-	LXI	H,0
+RWDFH:	MOV	A,M
+	ANI	07h	; 0000 0111
+	STA	SSECT	; сохраняем смещение сектора CP/M в секторе НЖМД
+	MVI	M,0F0h	; поправляем метку адресации LBA НЖМД
+RWDF:;	MOV	C,M	; сохраняем номер диска в C
+	LXI	H,0	; чтение/запись НГМД/НЖМД...
 	DAD	SP
-	SHLD	READSP+1
+	SHLD	SVSP+1
 	LXI	SP,DRIVSP
 	CALL	DRIV
-READSP:	LXI	SP,0
+	LDA	ERROR
+	ANA	A
+SVSP:	LXI	SP,0	; <- правится указатель стека
 	RET
+;
+READ:	MVI	D,2	; <<< чтение с дискового устройства
+	LXI	H,DISK
+	MOV	A,M
+	ANI	0FEh	; 1111 1110
+	JZ	RWDF	; (00 / 01) >> не КД, переход к чтению/записи
+	ANI	0FCh	; 1111 1100
+	JZ	READ02	; (02 / 03) >> КД, переход к чтению/записи
+	ANI	0F8h	; 1111 1000
+	CPI	0F0h
+	JZ	RWDFH	; >> метка НЖМД, переход к чтению/записи
+	MVI	A,-1
+	RET		; >> если диск > 3
 ;
 READ02:	CALL	KVDR
 	LXI	H,VDMA
@@ -467,21 +492,25 @@ HDCMP:	MOV	A,H	; возврат Z=0, если DE=HL
 	SUB	E
 	RET
 ;
-WRITE:	MVI	D,1	; режим записи
-	LDA	DISK
-	SUI	2
-	JNC	WRITKV	; A>=2	>> переход к записи на КД
+; При вызове этой функции в регистре С передается дополнительный флаг,
+; обозначающий тип записываемого сектора:
+; 0 - обычный сектор,
+; 1 - сектор из области директория,
+; 2 - первый сектор нового блока данных (начальное значение данного блока неважно).
+WRITE:	MVI	D,1	; <<< запись на дисковое устройство
+	LXI	H,DISK
+	MOV	A,M
+	ANI	0FEh	; 1111 1110 -- маска (00 / 01)
+	JZ	RWDF	; >> не КД, переход к чтению/записи
+	ANI	0FCh	; 1111 1100 -- маска (02 / 03)
+	JZ	WRITKV	; >> КД, переход к чтению/записи
+	ANI	0F8h	; 1111 1000 -- маска
+	CPI	0F0h
+	JZ	RWDFH	; >> метка НЖМД, переход к чтению/записи
 	MVI	A,-1
-	RP
-	LXI	H,0
-	DAD	SP
-	SHLD	WRITSP+1
-	LXI	SP,DRIVSP
-	CALL	DRIV
-WRITSP:	LXI	SP,0
-	RET
+	RET		; >> если диск > 3
 ;
-WRITKV:	JNZ	WRKV	; если КД11, то пропускаем >>(1)
+WRITKV:	JC	WRKV	; если КД11, то пропускаем >>(1)
 	LDA	TRACK	; (защита от записи в системную область КД)
 	CPI	180
 	JC	WRKV	; < 180 >>(1)
@@ -790,63 +819,138 @@ KADR:	.DW	0
 KCRC:	.DW	0
 PORT10:	.DB	0
 ;
-DRIV:	CALL	DRIV20
-	LDA	ERROR
-	ANA	A
+; преобразование TRС/SEC CP/M в LBA для НЖМД
+; HL = adr(HDDx+1) -- ссылка на номер дискеты НЖМД
+; на выходе исправленные TRC0, SECT0
+TOLBA:	PUSH	H
+	LHLD	TRC0
+;	MVI	H,000H
+	MOV	D,H
+	MOV	E,L
+	DAD	H
+	DAD	H
+	DAD	D	; HL= дорожка * 5
+	LDA	SECT0
+	MOV	E,A
+	MVI	D,0
+	DAD	D
+	DAD	H	; HL= дорожка * 10 + сектор * 2
+	LDA	TRC0	; дорожка, = FFh при инициализации НЖМД (чтении 1-го сектора)
+	CPI	8
+	JNC	TLBA2	; переход если дорожка >= 08h (несистемная область)
+	POP	D
+	LXI	D,2
+	XRA	A
+	JMP	TLBA3
+;
+TLBA1:	POP	D
+	CPI	0FFH
+	LXI	D,0F60AH	; = -09F6h	;ЧТО БЫ 0 СЕКТ.
+	JZ	TLBA3
+	JMP	TLBA4
+;
+TLBA2:	CPI	0A5H	; максимальный номер дорожки 0A4h
+	JNC	TLBA1	; переход если дорожка >= 0A5h
+	XTHL		; HL <-> [стек]
+	INX	H
+	MOV	E,M
+	INX	H
+	MOV	D,M
+	INX	H
+	MOV	A,M	; (A,DE)=(номер первого сектора дискеты из таблицы)
+	POP	H
+TLBA3:	DAD	D
+	ACI	000H
+	STA	HTRC0	; (A,HL) = (номер сектора) + (номер первого сектора дискеты) = 00 0000h
+	MOV	A,L
+	STA	SECT0
+	MOV	A,H
+	STA	TRC0
+	XRA	A
+TLBA4:	STA	ERROR
 	RET
 ;
-DRIV20:	DCR	D
+CDTS:	LDA	DISK0	; проверка совпадения Disk/Track/Sector
+	LXI	H,ODISK
+	CMP	M
+	RNZ		; >> диск не совпадает
+	LDA	SECT0
+	LXI	H,OSECT
+	CMP	M
+	RNZ		; >> сектор не совпадает
+	LHLD	OTRACK
+	LDA	TRC0
+	CMP	L
+	RNZ		; >> трек не совпадает
+	LDA	HTRC0
+	CMP	H
+	RET		; >> трек не совпадает
+;
+;DRIV:	CALL	DRIV20
+;	LDA	ERROR
+;	ANA	A
+;	RET
+;
+DRIV:	DCR	D	; кэширование чтения/записи с НГМД и НЖМД
 	MOV	A,D
-	STA	OPER
+	STA	OPER	; 0-запись, 1-чтение
 	PUSH	PSW
 	LXI	H,PARAM	; откуда
 	LXI	D,PARAM0	; куда
 	MVI	B,7	; сколько
 	CALL	COPY10	; копируем
+	LDA	DISK0
+	CPI	0F0h	; Диск = 0F0h?
+	JZ	DRIV21	; переданы TRC/SECT для НЖМД в режиме LBA, пропускаем пересчёт
+	MOV	D,A	; сохраняем диск в D
 	LXI	H,SECT0
 	DCR	M
 	MOV	A,M
+	ANI     7	; 0000 0111
+	STA	SSECT	; SSECT = (SECT0-1) % 8 (смещение)
+	MOV	A,M
+	ANI     0F8h	; 1111 1000
+	RRC
+	RRC
+	RRC
+	MOV	M,A	; SECT0 = (SECT0-1) / 8 (перевод в сектора НГМД)
+	DCR	H	; HL = adr(HTRC0)
+	MVI	M,0	; обнуляем старший разряд TRC0, во избежание глюков
+	MOV	A,D	;	LDA	DISK0
 	ANA	A
-	RAR
-	ANA	A
-	RAR
-	ANA	A
-	RAR
-	STA	RSECT
-	POP	PSW
-	JZ	DRIV22
-	CALL	DRIV50
+	LXI	H,HDDA
+	JZ	$+6	; (1)>>
+	LXI	H,HDDB
+	MOV	A,M	; <<(1)
+	INX	H
+	ORA	M	; проверка НГМД или НЖМД? (HL = ссылка на HDDx+1)
+	JZ	DRIV21	; >> значит флопик
+	MVI	A,0F0h
+	STA	DISK0	; метка, что это НЖМД
+	CALL	TOLBA	; расчёт LBA и корректировка TRC0, SECT0
+	RNZ		; >> выход по ошибке (неправильный трек)
+DRIV21:	POP	PSW
+	JZ	DRIV22	; >> запись
+	CALL	DRIV50	; чтение
 	JMP	DRIV30
 ;
-DRIV50:	LDA	OOPER
+DRIV50:	LDA	OOPER	; (чтение)
 	ANA	A
-	RNZ
-	LDA	TYPEWR
+	RNZ		; >> до этого было чтение
+	LDA	TYPEWR	; тип записываемого сектора
 	DCR	A
-	RZ
-	LDA	OSECT0
-	ANI	7
+	RZ		; >> если писалась директория
+	LDA	SSECT0
 	CPI	7
-	RZ
+	RZ		; >> или сектор 7
 	JMP	FISWR
 ;
-DRIV22:	LDA	OOPER
+DRIV22:	LDA	OOPER	; (запись)
 	ANA	A
 	JNZ	DRI23V
-	LDA	DISK0
-	LXI	H,ODISK
-	CMP	M
-	JNZ	DRIV23
-	LDA	OTRACK
-	LXI	H,TRC0
-	CMP	M
-	JNZ	DRIV23
-	LDA	RSECT
-	LXI	H,OSECT
-	CMP	M
-	JNZ	DRIV23
-	JMP	DRI23V
-;
+	CALL	CDTS	; проверка совпадения Disk/Track/Sector
+;	JNZ	DRIV23	; >> не совпадает
+	JZ	DRI23V	; всё совпало
 DRIV23:	LDA	PISAT
 	ANA	A
 	JNZ	DRI23V
@@ -856,72 +960,60 @@ DRI23V:	MOV	A,C
 	DCR	A
 	CZ	DRIV50
 	POP	PSW
-	STA	TYPEWR
+	STA	TYPEWR	; тип записываемого сектора
 	LXI	H,OOPER
 	MOV	A,M
 	ANA	A
-	LDA	OPER0
+	LDA	OPER0	; 0-запись, 1-чтение
 	MOV	M,A
 	JNZ	DRIV32
 DRIV30:	LDA	PISAT
 	ANA	A
 	CNZ	FISWR
-	LDA	OPER0
+	LDA	OPER0	; 0-запись, 1-чтение
 	STA	OOPER
 	XRA	A
 	STA	PISAT
-	LXI	H,DISK0
-	LDA	ODISK
-	CMP	M
-	JNZ	DRIV32
-	LXI	H,TRC0
-	LDA	OTRACK
-	CMP	M
-	JNZ	DRIV32
-	LDA	RSECT
-	LXI	H,OSECT
-	CMP	M
-	JNZ	DRIV32
-	LDA	OPER0
+	CALL	CDTS	; проверка совпадения Disk/Track/Sector
+	JNZ	DRIV32	; >> не совпадает
+	LDA	OPER0	; 0-запись, 1-чтение
 	ANA	A
-	JZ	DRIV34
+	JZ	DRIV34	; >>
+	LDA	SSECT
+	ANA	A	; (сектор % 8) <>0 ?
+	JNZ	DRIV34	; >>
+DRIV32:	LDA	DISK0	; обновляем...
+	STA	ODISK	; ...диск
+	LHLD	TRC0
+	SHLD	OTRACK	; ...трек
 	LDA	SECT0
-	ANI	7
-	JNZ	DRIV34
-DRIV32:	LDA	DISK0
-	STA	ODISK
-	LDA	TRC0
-	STA	OTRACK
-	LDA	RSECT
-	STA	OSECT
+	STA	OSECT	; ...сектор
 	CALL	FISRD
-DRIV34:	LDA	SECT0
-	ANI	7
+DRIV34:	LDA	SSECT
 	RAR
 	MOV	H,A
 	MVI	A,0
 	RAR
-	MOV	L,A
+	MOV	L,A	; HL = (сектор % 8) * 128
 	LXI	D,RDMA
 	DAD	D
 	SHLD	WRKDMA
-	LDA	OPER0
+	LDA	OPER0	; 0-запись, 1-чтение
 	DCR	A
-	JZ	DRIV35
+	JZ	DRIV35	; >> чтение
 	CALL	WRIT10
 	JMP	DRIV36
 ;
 DRIV35:	CALL	READ10
-DRIV36:	LDA	OPER0
+DRIV36:	LDA	OPER0	; 0-запись, 1-чтение
 	DCR	A
-	RZ
-	LDA	TYPEWR
+	RZ		; >> выход, если чтение
+	LDA	TYPEWR	; тип записываемого сектора
 	CPI	1
-	JZ	DRIV40
-	LDA	SECT0
-	STA	OSECT0
-	ANI	7
-	CPI	7
+	JZ	DRIV40	; >> если это директория
+	LDA	SSECT
+	STA	SSECT0
+	CPI	7	; (сектор % 8) <> 7 ?
 	RNZ
 	MVI	A,1
 	STA	PISAT
@@ -932,20 +1024,12 @@ DRIV40:	XRA	A
 	CALL	FISWR
 	RET
 ;
-TSTHDD:	LXI	H,HDDA
-	LDA	ODISK
-	ANA	A
-	JZ	$+6
-	LXI	H,HDDB
-	MOV	A,M
-	INX	H
-	ORA	M
-	RET
-;
 FISRD:	MVI	A,8
 	STA	WOPER
-	CALL	TSTHDD
-	JNZ	RDHDD
+	LDA	ODISK
+	CPI	0F0h
+;	CALL	TSTHDD
+	JZ	RDHDD	; >> чтение с НЖМД
 FSRD00:	DI
 	CALL	POWER
 	LDA	OSECT
@@ -993,8 +1077,10 @@ FSRDNR:	LXI	H,STRNTR
 ;
 FISWR:	MVI	A,8
 	STA	WOPER
-	CALL	TSTHDD
-	JNZ	WRHDD
+	LDA	ODISK
+	CPI	0F0h
+;	CALL	TSTHDD
+	JZ	WRHDD	; >> запись на НЖМД
 FSWR00:	DI
 	CALL	POWER
 	LDA	OSECT
@@ -1049,13 +1135,15 @@ FSWR20:	LDA	3FH	; режим обработки ошибок
 	LDA	ERROR
 	CALL	HEXOUT
 	CALL	FSWR22
-	LDA	OPER0
+	LDA	OPER0	; 0-запись, 1-чтение
 	CALL	HEXOUT
 	CALL	FSWR22
 	LDA	DISK0
 	CALL	HEXOUT
 	CALL	FSWR22
-	LDA	TRC0
+	LDA	HTRC0	; старший разряд
+	CALL	HEXOUT
+	LDA	TRC0	; младший разряд
 	CALL	HEXOUT
 	CALL	FSWR22
 	LDA	SECT0
@@ -1129,7 +1217,7 @@ WRPROT:	LXI	H,STRWPR
 ;
 PORT1C:	.DB	34H
 POWER:	CALL	MOTOR
-	LDA	OTRACK
+	LDA	OTRACK	; <- можно 8 бит
 	ANA	A
 	RAR
 	STA	FTRACK
@@ -1173,7 +1261,7 @@ TRAN9A:	MOV	A,B
 MOTOR:	LDA	ODISK
 	ANI	3
 	MOV	H,A
-	LDA	OTRACK
+	LDA	OTRACK	; <- можно 8 бит
 	ANI	1
 	XRI	1
 	RLC
@@ -1750,21 +1838,23 @@ ZAGD:	.DW 0,0,0,0,DIRBUF,PARD,0,ALVD
 TTRC:	.DB 0,0
 PARAM0:	.DS	7	; <=
 PARAM:	.DS	7	; <=
-ODISK:	.DB	-1
-OTRACK:	.DB	-1
-OOPER:	.DB	1
-OSECT:	.DB	-1
-RSECT:	.DB	-1
+ODISK:	.DB	-1	; номер диска	-- что сейчас в DMA
+OOPER:	.DB	1	; операция	-- что сейчас в DMA	0-запись, 1-чтение
+OTRACK:	.DW	-1	; номер трека	-- что сейчас в DMA
+OSECT:	.DB	-1	; сектор диска	-- что сейчас в DMA
+SSECT:	.DB	-1	; (сектор CPM - 1) % 8 -- смещение
 PISAT:	.DB	0
 ERROR:	.EQU	3DH
-DISK:	.EQU	PARAM
-OPER:	.EQU	PARAM+2
-TRACK:	.EQU	PARAM+3
-SECT:	.EQU	PARAM+4
-DMA:	.EQU	PARAM+5
+DISK:	.EQU	PARAM	; диск
+OPER:	.EQU	PARAM+1	; 0-запись, 1-чтение
+TRACK:	.EQU	PARAM+2	; трек, мл.байт
+HTRC:	.EQU	PARAM+3	; трек, ст.байт
+SECT:	.EQU	PARAM+4	; сектор
+DMA:	.EQU	PARAM+5	; адрес DMA
 DISK0:	.EQU	PARAM0
-OPER0:	.EQU	PARAM0+2
-TRC0:	.EQU	PARAM0+3
+OPER0:	.EQU	PARAM0+1
+TRC0:	.EQU	PARAM0+2
+HTRC0:	.EQU	PARAM0+3
 SECT0:	.EQU	PARAM0+4
 DMA0:	.EQU	PARAM0+5
 DRIVEA:	.EQU	ZAGA
@@ -1772,8 +1862,8 @@ DRIVEB:	.EQU	ZAGB
 DRIVEC:	.EQU	ZAGC
 DRIVED:	.EQU	ZAGD
 VRTBUF:	.DS	40	; <=
-OSECT0:	.DB	0
-WRKDMA:	.DW	0
+SSECT0:	.DB	0
+WRKDMA:	.DW	0	; ссылка на сектор CPM в DMA
 ;
 USED:	MVI	C,31	; <<<< функция 1/80h -- свободно на диске, Кб
 	CALL	CPM	; Получение адреса блока параметров диска
@@ -1859,7 +1949,10 @@ COUTBF:	.DS	36	; <=
 COUDMA:	.EQU	ZAPL2
 BATBF:	.DS	36	; <=
 BATDMA:	.DS	128	; <=
-HDDA:	.DB	1,0,2,0,0
+HDDA:	.DW	00001h	; номер дискеты в HEX
+	.DW	00002h	; номер первого сектора в HEX, мл.разряд 24bit
+	.DB	000h	; номер первого сектора в HEX, ст.разряд 24bit
+;	.DB	1,0,2,0,0
 HDDB:	.DB	0,0,0,0,0
 ;
 SETHDD:	LDA	4
@@ -1867,7 +1960,7 @@ SETHDD:	LDA	4
 	MOV	C,A
 	MVI	A,0FFH
 	RNC
-HDDAT:	LXI	H,-1	; <= значение меняется из RDSH  -- (10000h - (число дискет))
+HDDAT:	LXI	H,-1	; <= значение меняется из RDSH  -- (FFFFh - (число дискет))
 	DAD	D
 	RC
 	LXI	H,HDDB
@@ -1925,57 +2018,18 @@ NEGHL:	MOV	A,L
 	INX	H
 	RET
 ;
-WRHDD:	MVI	C,10h	; C<>0 признак записи
+WRHDD:	MVI	C,10h	; C=10h признак записи
 	JMP	HDD
 RDHDD:	MVI	C,0	; C=0 признак чтения
-HDD:	PUSH	H
-	LHLD	OTRACK
-	MVI	H,000H
-	MOV	D,H
-	MOV	E,L
-	DAD	H
-	DAD	H
-	DAD	D	; HL= дорожка * 5
-	LDA	OSECT
-	MOV	E,A
-	MVI	D,0
-	DAD	D
-	DAD	H	; HL= дорожка * 10 + сектор * 2
-	LDA	OTRACK	; дорожка, = FFh при инициализации НЖМД (чтении 1-го сектора)
-	CPI	8
-	JNC	AD85F	; переход если дорожка >= 08h (несистемная область)
-	POP	D
-	LXI	D,2
-	XRA	A
-	JMP	AD86C
-;
-AD853:	POP	D
-	CPI	0FFH
-	LXI	D,0F60AH	; = -09F6h	;ЧТО БЫ 0 СЕКТ.
-	JZ	AD86C
-	JMP	HDDERR
-;
-AD85F:	CPI	0A5H	; максимальный номер дорожки 0A4h
-	JNC	AD853
-	XTHL
-	INX	H
-	MOV	E,M
-	INX	H
-	MOV	D,M
-	INX	H
-	MOV	A,M	; (A,DE)=(номер первого сектора дискеты)
-	POP	H
-AD86C:	DAD	D
-	ACI	000H
-	MOV	E,A	; (E,HL) = (номер сектора) + (номер первого сектора дискеты) = 00 0000h
-	CALL	READY
+HDD:	CALL	READY
 	JZ	HDDERR
-	MOV	A,E
-	OUT	055H	; LBA [23..16]
-	MOV	A,L
+	LHLD	OTRACK
+	LDA	OSECT	; (HL,A) = номер сектора LBA (24 бита)
 	OUT	053H	; LBA [7..0]
-	MOV	A,H
+	MOV	A,L
 	OUT	054H	; LBA [15..8]
+	MOV	A,H
+	OUT	055H	; LBA [23..16]
 	MVI	A,0E0h	; 1110 0000
 	OUT	056H	; режим и LBA[27..24]
 REPOP:	MVI	A,2	; количество читемых/записываемых секторов
@@ -2069,7 +2123,3 @@ ADA02:	MOV	B,A	; В = код ошибки
 	OUT	05FH	; Системный сброс (лучше не пользоваться, сходство с 57Н без обнуления микросхем жесткого диска).
 ADA15:	STA	ERROR
 	JMP	FSWR20	; На обработку ошибки
-;
-	.org 0BF7Fh	; выравнивание размера
-	.db 0
-	.END
