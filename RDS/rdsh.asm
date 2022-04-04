@@ -192,13 +192,12 @@ INIHDD:	LXI	D,STRHDD	;"Инициализация HDD...$"
 	CALL	SETDMA
 	MVI	A,2
 	STA	3FH
-	MVI	B,4
+	LXI	B,04F1h	; B=4 (счётчик), C=0F0h+1 (НЖМД, сектор 1 CP/M) или C=0
 INIH10:	PUSH	B
-	MVI	C,0
 	CALL	SELDSK
-	MVI	C,2
+	MVI	C,0	; или 2
 	CALL	SETSEC
-	MVI	C,-1
+	LXI	B,0	; или 00FFh
 	CALL	SETTRK
 	CALL	READ
 	ANA	A
@@ -220,16 +219,12 @@ INIH12:	DI		; занесение характеристик НЖМД в БСВВ
 	STA	3FH
 	MVI	A,20H	; 0010 0000b -- банк 3 как ОЗУ A000-DFFFh
 	OUT	10H
-	LHLD	0A000H	; HL = 0AE00h
+	LHLD	0A000H	; HL = CBIOS (0AE00h)
 	LXI	D,41H
 	DAD	D
 	MOV	E,M
 	INX	H
-	MOV	D,M	; DE = HDDAT+1 (BIOS)
-;	XCHG
-;	MOV	E,M
-;	INX	H
-;	MOV	D,M
+	MOV	D,M
 	XCHG		; HL = HDDAT+1 (BIOS)
 	SHLD	APAR2+1
 	LHLD	84H	; -- количество дискет
@@ -239,8 +234,8 @@ INIH12:	DI		; занесение характеристик НЖМД в БСВВ
 	MOV	A,L
 	CMA
 	MOV	L,A
-	INX	H
-APAR2:	SHLD	0	; => HDDAT+1 (BIOS) = (10000h - (число дискет))
+;	INX	H
+APAR2:	SHLD	0	; => HDDAT+1 (BIOS) = (FFFFh - (число дискет))
 	MVI	A,23H	; 0010 0011b -- банк 0 как ОЗУ A000-DFFFh
 	OUT	10H
 	EI
@@ -499,8 +494,8 @@ STR0:	.DB 12,27,'/',27,'b'
 ;	.DB " Марта 24 числа 1997г. от Р.Х."
 	.DB " э┴╥╘┴ 24 ▐╔╙╠┴ 1997╟. ╧╘ Є.ш."
 	.DB 10,27,'a'
-;	.DB "Модификация 21.03.2022г., Impro"
-	.DB "э╧─╔╞╔╦┴├╔╤ 21.03.2022╟., Impro"
+;	.DB "Модификация 31.03.2022г., Impro"
+	.DB "э╧─╔╞╔╦┴├╔╤ 31.03.2022╟., Impro"
 	.DB "ver",10,'$'
 STR1:;	.DB 10,"Квази-диск отформатирован.$"
 	.DB 10,"ы╫┴┌╔-─╔╙╦ ╧╘╞╧╥═┴╘╔╥╧╫┴╬.$"
