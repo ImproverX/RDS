@@ -11,7 +11,6 @@
 	JMP	INKEY
 	.DW	XX	; +1Eh
 DISKI:	.EQU	0AE33H
-;DISKS:	.EQU	0AE46H	; количество дисковых устройств -1
 VIRADR:	.EQU	0FB00h	; == адрес начала virt
 VIRSRC:	.EQU	0D380H	; == адрес хранения virt
 VTAB:	.EQU	VIRADR+39H
@@ -142,10 +141,6 @@ ST12:	MOV	M,E
 	STA	3
 	MVI	A,2	;+++
 	STA	4	; номер текущего диска = 2 (C:) (было 0)
-;
-;	CALL	TDSK	; ПП проверки наличия второго КД (virt)
-;	STA	DISKS
-;
 	LDA	BORD
 	ORI	10H
 	STA	BORD
@@ -708,13 +703,13 @@ PRNTSL:	CPI	8
 PRNC16:	MVI	A,28H
 	STA	ESCCNT
 	LDA	CURX
-	STA	SCURX
+	STA	SCURX+1	;>>>
 	MVI	A,0C3H
 	STA	PRNT13
 	MVI	C,20H
 	JMP	PRNT10
 ;
-SCURX:	.DB	0
+;SCURX:	.DB	0
 ;
 PRC160:	LDA	CURX
 	ANI	7
@@ -745,7 +740,7 @@ PRC160:	LDA	CURX
 	MVI	E,0E0H
 	MVI	A,2
 	CALL	VIRT
-	LDA	SCURX
+SCURX:	MVI	A,0	;LDA	SCURX
 	STA	CURX
 	XRA	A
 	STA	ESCCNT
@@ -1237,7 +1232,8 @@ TABGR:	.DB 94H,91H,94H,83H,90H,0A9H,84H,0AAH,92H,8FH,93H,95H
 TMASC:	.DB 0E0H,0,70H,0,38H,0,1CH,0
 	.DB 0EH,0,7,0,3,080H,1,0C0H
 DRTAB:	.DS	16
-INVTAB:	.DS	16
+INVTAB:	.DS	15	;<-16
+	.db 0
 ;
 	.org 0D37Fh	; выравнивание размера
 	.db 0
