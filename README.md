@@ -21,8 +21,8 @@
 | надпись "РДС..."  |BEE0h..BF7Fh|
 | vird7             |BF80h..DFFFh|
 | шрифт             |C000h..C9FFh|
-| disp              |CA00h..D301h|
-| _(нули)_          |D302h..D37Fh|
+| disp              |CA00h..D2FFh|
+| _(нули)_          |D300h..D37Fh|
 | virt              |D380h..D7DEh|
 | _(нули)_          |D7DFh..DFFFh|
 
