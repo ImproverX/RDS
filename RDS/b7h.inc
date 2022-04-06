@@ -292,6 +292,7 @@ COMER:	LXI	H,STRCE
 	CALL	PRINT
 	DI
 	HLT
+;
 STRCE:;	.DB 10,"Отсутствует файл C:COMMAND.SYS !",7,0
 	.DB 10,"я╘╙╒╘╙╘╫╒┼╘ ╞┴╩╠ C:COMMAND.SY"
 	.DB "S !",7,0
@@ -359,12 +360,11 @@ VECT:	ADD	A
 	MOV	L,E
 	RET
 ;
-RWDFH:	MOV	A,M
+RWDFH:	MOV	A,M	; чтение/запись НЖМД по LBA
 	ANI	07h	; 0000 0111
 	STA	SSECT	; сохраняем смещение сектора CP/M в секторе НЖМД
 	MVI	M,0F0h	; поправляем метку адресации LBA НЖМД
-RWDF:;	MOV	C,M	; сохраняем номер диска в C
-	LXI	H,0	; чтение/запись НГМД/НЖМД...
+RWDF:	LXI	H,0	; чтение/запись НГМД/НЖМД...
 	DAD	SP
 	SHLD	SVSP+1
 	LXI	SP,DRIVSP
@@ -374,20 +374,37 @@ RWDF:;	MOV	C,M	; сохраняем номер диска в C
 SVSP:	LXI	SP,0	; <- правится указатель стека
 	RET
 ;
-READ:	MVI	D,2	; <<< чтение с дискового устройства
-	LXI	H,DISK
+; При вызове этой функции в регистре С передается дополнительный флаг,
+; обозначающий тип записываемого сектора:
+; 0 - обычный сектор,
+; 1 - сектор из области директория,
+; 2 - первый сектор нового блока данных (начальное значение данного блока неважно).
+WRITE:	XRA	A	; <<< запись на дисковое устройство
+	JMP	DRIVE
+;
+READ:	MVI	A,1	; <<< чтение с дискового устройства
+DRIVE:	STA	OPER	; 0-запись, 1-чтение
+	LXI	H,PARAM
+	LXI	D,PARAM0
+	MVI	B,7
+	CALL	COPY10	; копирование из adr(PARAM) в adr(PARAM0) B=7 байт
+	LXI	H,DISK0
 	MOV	A,M
 	ANI	0FEh	; 1111 1110
 	JZ	RWDF	; (00 / 01) >> не КД, переход к чтению/записи
 	ANI	0FCh	; 1111 1100
-	JZ	READ02	; (02 / 03) >> КД, переход к чтению/записи
+	JZ	RWKV	; (02 / 03) >> КД, переход к чтению/записи
 	ANI	0F8h	; 1111 1000
 	CPI	0F0h
 	JZ	RWDFH	; >> метка НЖМД, переход к чтению/записи
 	MVI	A,-1
 	RET		; >> если диск > 3
 ;
-READ02:	CALL	KVDR
+RWKV:	LDA	OPER0	; <<<<< чтение/запись КД
+	ANA	A
+	JZ	WRITKV	; >> КД, переход к записи
+READ02:	CALL	KVRAS	; расчёт адреса сектора на КД
+	CALL	KVRD
 	LXI	H,VDMA
 	SHLD	WRKDMA
 READ04:	PUSH	PSW
@@ -492,36 +509,6 @@ HDCMP:	MOV	A,H	; возврат Z=0, если DE=HL
 	SUB	E
 	RET
 ;
-; При вызове этой функции в регистре С передается дополнительный флаг,
-; обозначающий тип записываемого сектора:
-; 0 - обычный сектор,
-; 1 - сектор из области директория,
-; 2 - первый сектор нового блока данных (начальное значение данного блока неважно).
-WRITE:	MVI	D,1	; <<< запись на дисковое устройство
-	LXI	H,DISK
-	MOV	A,M
-	ANI	0FEh	; 1111 1110 -- маска (00 / 01)
-	JZ	RWDF	; >> не КД, переход к чтению/записи
-	ANI	0FCh	; 1111 1100 -- маска (02 / 03)
-	JZ	WRITKV	; >> КД, переход к чтению/записи
-	ANI	0F8h	; 1111 1000 -- маска
-	CPI	0F0h
-	JZ	RWDFH	; >> метка НЖМД, переход к чтению/записи
-	MVI	A,-1
-	RET		; >> если диск > 3
-;
-WRITKV:	JC	WRKV	; если КД11, то пропускаем >>(1)
-	LDA	TRACK	; (защита от записи в системную область КД)
-	CPI	180
-	JC	WRKV	; < 180 >>(1)
-	CPI	196
-	RC		; возврат, если (180 <= ТРЕК < 196)
-WRKV:	LXI	H,VDMA	; <(1)
-	SHLD	WRKDMA
-	CALL	WRIT10
-	MVI	D,1
-	JMP	KVDR
-;
 WRIT10:	LHLD	WRKDMA
 	XCHG
 	LHLD	DMA
@@ -608,18 +595,7 @@ COPY10:	MOV	A,M	; копирование из adr(HL) в adr(DE) B байт
 	JNZ	COPY10
 	RET
 ;
-KVDR:	DCR	D	; 1-запись, 2-чтение
-	MOV	A,D
-	STA	OPER	; 0-запись, 1-чтение
-	PUSH	PSW
-	LXI	H,PARAM
-	LXI	D,PARAM0
-	MVI	B,7
-	CALL	COPY10	; копирование из adr(PARAM) в adr(PARAM0) B=7 байт
-	CALL	KVRAS	; расчёт адреса сектора на КД
-	POP	PSW
-	JZ	KVWR	; >> на запись
-KVRD:	LXI	H,0
+KVRD:	LXI	H,0	; <<<<< чтение с КД
 	DI
 	DAD	SP
 	SHLD	KVDR10+1
@@ -693,7 +669,18 @@ KVRD14:	LXI	H,KVDR10
 	MVI	A,1CH
 	JMP	10H	; >>> запись КД РУ7
 ;
-KVWR:	LXI	H,0	; <<<< запись на КД
+			; <<<<< запись на КД
+WRITKV:	JC	KVWR00	; если КД11, то пропускаем >>(1)
+	LDA	TRC0	; (защита от записи в системную область КД)
+	CPI	180
+	JC	KVWR00	; < 180 >>(1)
+	CPI	196
+	RC		; возврат, если (180 <= ТРЕК < 196)
+KVWR00:	LXI	H,VDMA	; <(1)
+	SHLD	WRKDMA
+	CALL	WRIT10
+	CALL	KVRAS	; расчёт адреса сектора на КД
+	LXI	H,0
 	DI
 	DAD	SP
 	SHLD	KVDR10+1
@@ -886,19 +873,14 @@ CDTS:	LDA	DISK0	; проверка совпадения Disk/Track/Sector
 	CMP	H
 	RET		; >> трек не совпадает
 ;
-;DRIV:	CALL	DRIV20
-;	LDA	ERROR
-;	ANA	A
-;	RET
-;
-DRIV:	DCR	D	; кэширование чтения/записи с НГМД и НЖМД
-	MOV	A,D
-	STA	OPER	; 0-запись, 1-чтение
-	PUSH	PSW
-	LXI	H,PARAM	; откуда
-	LXI	D,PARAM0	; куда
-	MVI	B,7	; сколько
-	CALL	COPY10	; копируем
+DRIV:;	DCR	D	; кэширование чтения/записи с НГМД и НЖМД
+;	MOV	A,D
+;	STA	OPER	; 0-запись, 1-чтение
+;	PUSH	PSW
+;	LXI	H,PARAM	; откуда
+;	LXI	D,PARAM0	; куда
+;	MVI	B,7	; сколько
+;	CALL	COPY10	; копируем
 	LDA	DISK0
 	CPI	0F0h	; Диск = 0F0h?
 	JZ	DRIV21	; переданы TRC/SECT для НЖМД в режиме LBA, пропускаем пересчёт
@@ -929,7 +911,9 @@ DRIV:	DCR	D	; кэширование чтения/записи с НГМД и Н
 	STA	DISK0	; метка, что это НЖМД
 	CALL	TOLBA	; расчёт LBA и корректировка TRC0, SECT0
 	RNZ		; >> выход по ошибке (неправильный трек)
-DRIV21:	POP	PSW
+DRIV21:;	POP	PSW
+	LDA	OPER0
+	ANA	A
 	JZ	DRIV22	; >> запись
 	CALL	DRIV50	; чтение
 	JMP	DRIV30
@@ -1340,9 +1324,11 @@ NBDS10:	MOV	A,C
 	MOV	H,M
 	MOV	L,A
 	PCHL
+;
 NBDSTB:	.DW TEST,USED,CINP,COUT,COUCLS,IBAT,BATS
 	.DW GBATP,GFBAT,VBIOS,FBAT,SCOM,DCOM
 	.DW CHKDSK,GETHDD,SETHDD
+;
 CHKDSK:	MVI	C,29
 	CALL	CPM
 	XCHG
@@ -1776,9 +1762,14 @@ TST0:	STA	3FH	; режим обработки ошибок
 	LXI	H,DIRBUF
 	SHLD	DMA
 	; + проверку E=2 и форматирование
-TEST20:	MVI	D,2	; режим чтения
-	CALL	KVDR
-;	CALL	READ	; чтение сектора
+	MVI	A,1	; <<< чтение с дискового устройства
+	STA	OPER	; 0-запись, 1-чтение
+	LXI	H,PARAM
+	LXI	D,PARAM0
+	MVI	B,7
+	CALL	COPY10	; копирование из adr(PARAM) в adr(PARAM0) B=7 байт
+TEST20:	CALL	KVRAS	; расчёт адреса сектора на КД
+	CALL	KVRD	; чтение сектора
 	ANA	A
 	JZ	TEST22
 	LXI	H,STRTS	; вывод ошибки
@@ -1786,19 +1777,19 @@ TEST20:	MVI	D,2	; режим чтения
 	LDA	ERROR
 	CALL	HEXOUT
 	CALL	FSWR22
-	LDA	TRACK
+	LDA	TRC0
 	CALL	HEXOUT
 	CALL	FSWR22
-	LDA	SECT
+	LDA	SECT0
 	CALL	HEXOUT
 	LDA	3FH	; режим обработки ошибок
 	CPI	3
 	CNC	FSWR22	; "исправлено"
-TEST22:	LXI	H,SECT
+TEST22:	LXI	H,SECT0
 	DCR	M
 	JNZ	TEST20	; цикл по секторам 8..1
 	MVI	M,8
-	LXI	H,TRACK
+	LXI	H,TRC0
 	DCR	M
 	MOV	A,M
 	INR	A	; CPI	0FFh
@@ -1862,7 +1853,7 @@ DRIVEB:	.EQU	ZAGB
 DRIVEC:	.EQU	ZAGC
 DRIVED:	.EQU	ZAGD
 VRTBUF:	.DS	40	; <=
-SSECT0:	.DB	0
+SSECT0:	.DB	0	; сектор СРМ в DMA (смещение)
 WRKDMA:	.DW	0	; ссылка на сектор CPM в DMA
 ;
 USED:	MVI	C,31	; <<<< функция 1/80h -- свободно на диске, Кб
@@ -2123,3 +2114,4 @@ ADA02:	MOV	B,A	; В = код ошибки
 	OUT	05FH	; Системный сброс (лучше не пользоваться, сходство с 57Н без обнуления микросхем жесткого диска).
 ADA15:	STA	ERROR
 	JMP	FSWR20	; На обработку ошибки
+;
