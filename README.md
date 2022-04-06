@@ -16,8 +16,9 @@
 |:------------------|:------------|
 | ccph              |(A000h-0B80h)..8FFFh|
 | bdos              |A000h..ADFFh|
-| bios (b7h)        |AE00h..BE8Ah|
-| _(нули)_          |BE8Bh..BF7Fh|
+| bios (b7h)        |AE00h..BE75h|
+| _(нули)_          |BE76h..BEDFh|
+| _надпись "РДС..."_|BEE0h..BF7Fh|
 | vird7             |BF80h..DFFFh|
 | шрифт             |C000h..C9FFh|
 | disp              |CA00h..D301h|
