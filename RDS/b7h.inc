@@ -21,7 +21,7 @@ P10:	.EQU	20H	; 0010 0000b -- банк 3 как ОЗУ A000-DFFFh
 ;
 VIRADR:	.EQU	0FB00h	;== адрес начала virt
 VIRSRC:	.EQU	0D380H	;== адрес хранения virt
-VPAR:	.EQU	0FDBCh	;== PARA (virt)
+VPAR:	.EQU	0FDBAh	;== PARA (virt)
 PARA:	.EQU	VPAR-VIRADR+VIRSRC	; == адрес хранения PARA virt
 PARB:	.EQU	PARA+15
 PARC:	.EQU	PARB+15
