@@ -9,7 +9,7 @@ KEYS:	.EQU	DISP+18	; = 0CA12H
 HEXOUT:	.EQU	DISP+21	; = 0CA15H
 PRINT:	.EQU	DISP+24	; = 0CA18H
 ;
-VIRD7:	.EQU	0BF80H	;== адрес хранения vird7
+VIRD7:	.EQU	0D300H	;== адрес хранения vird7
 ZAPL:	.EQU	0D800H	;DISP !
 ZAPL2:	.EQU	0D880h	;было 0C000H	;+++++++++++ b7h
 RDMA:	.EQU	0D900H	; (L должно быть =0) размер 1024 байта
@@ -562,7 +562,7 @@ BDWRIT:	PUSH	D
 	XCHG
 	LXI	SP,100H
 	MVI	C,20	; счётчик
-	CALL	83H	; >> пишем в SP:=HL (КД) из adr(DE)
+	CALL	83H	; >> VIRD7, пишем в SP:=HL (КД) из adr(DE)
 	JMP	COPYX
 ;BDWR10:	LXI	SP,0
 ;	LXI	H,SWAP	; восстановление adr(128-255)
@@ -581,7 +581,7 @@ BDREAD:	DI
 	LXI	H,VRTBUF
 	LXI	SP,100H
 	MVI	C,20
-	CALL	80H	; >> пишем в adr(DE) из SP:=HL (КД)
+	CALL	80H	; >> VIRD7, пишем в adr(DE) из SP:=HL (КД)
 COPYX:	LXI	SP,0
 	LXI	H,SWAP	; восстановление adr(128-255)
 	LXI	D,128
