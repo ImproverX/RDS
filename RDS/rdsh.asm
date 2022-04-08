@@ -9,19 +9,23 @@ SETDMA:	.EQU	0FB24H
 WRITE:	.EQU	0FB2AH
 READ:	.EQU	0FB27H
 ;OS:	.EQU	400H
-TDSK:	.EQU	OS+38h		; ПП проверки наличия КД11
 DISKS:	.EQU	0AE46H		; количество дисковых устройств -1
-STRA:	.EQU	0BEE0H+1	; ссылка на надпись в загрузчике
+STRA:	.EQU	0BF60H+1	; ссылка на надпись в загрузчике
 DMARK:	.EQU	STRA+62h
-PACK:	.EQU	OS+80h
+STR0:	.EQU	0BE98h		; ссылка на первую надпись РДС
 LCOM:	.EQU	0B80h		; размер файла ccph.obj
+LLDR:	.EQU	0080h		; размер файла loaderkd.obj
 #ifdef NoPACK
-RDS:	.EQU	PACK+LCOM	; << начало блока + размер файла ccph.obj
-COM:	.EQU	PACK
+LDR:	.EQU	OS
+COM:	.EQU	OS+LLDR
+RDS:	.EQU	COM+LCOM	; << начало блока + размер ccph.obj и loaderkd.obj
 #else
-RDS:	.EQU	PACK		;
-COM:	.EQU	0A000H-LCOM	; туда будут распакованы данные
+RDS:	.EQU	OS		; начало архива
+COM:	.EQU	0A000H-LCOM
+LDR:	.EQU	COM-LLDR	; туда будут распакованы данные
 #endif
+TDSK:	.EQU	LDR+38h		; ПП проверки наличия КД11
+;
 	LXI	SP,80H
 ;;	JMP	START
 START:	DI
@@ -46,7 +50,7 @@ FIL0:	STAX	D
 	CPI	0E0H
 	JC	FIL0		; цикл до адреса E000h
 #else
-	LXI	D,COM		; куда
+	LXI	D,LDR		; куда
 	CALL	unlzsa1		; распаковка
 #endif
 	CALL	STDISP		; (0CA00H)
@@ -135,15 +139,13 @@ REP12:	PUSH	D
 	STA	3FH
 	MVI	A,1	; сколько секторов (по 128 байт)
 	STA	WSECT
-	LXI	H,OS	; откуда
+	LXI	H,LDR	; откуда
 	SHLD	DMA
 	LXI	H,FILE0
 	CALL	SAVE	; сохр.файла OS.COM / RDS.COM
 	MVI	A,23	; сколько секторов (по 128 байт)
 	STA	WSECT
-
 	LXI	H,COM	; откуда
-
 	SHLD	DMA
 	LXI	H,FILE1
 	CALL	SAVE	; сохр.файла COMMAND.SYS
@@ -240,12 +242,6 @@ APAR2:	SHLD	0	; => HDDAT+1 (BIOS) = (FFFFh - (число дискет))
 	OUT	10H
 	EI
 	RET
-;
-DMA:	.DW	0
-WSECT:	.DB	0
-FILE0:	.DB 0,"RDS     COM"	; или OS.COM после форматирования КД
-FILE1:	.DB 0,"COMMAND SYS"
-FILE2:	.DB 0,"RDS     SYS"
 ;
 SAVE:	LXI	D,5CH
 	PUSH	D
@@ -481,22 +477,6 @@ ManyLiterals:
 	mov b,m
 	jmp CopyLiterals_UseC
 #endif
-STR0:	.DB 12,27,'/',27,'b'
-;	.DB "(c) Резидентная Дисковая Систем"
-	.DB "(c) Є┼┌╔─┼╬╘╬┴╤ ф╔╙╦╧╫┴╤ є╔╙╘┼═"
-;	.DB "а.              Версия 3.07 "
-	.DB "┴.              ў┼╥╙╔╤ 3.07 "
-	.DB 10
-;	.DB "(c) Вьюнов В.А.   Copyright (c)"
-	.DB "(c) ў╪└╬╧╫ ў.с.   Copyright (c)"
-	.DB " 1994-1997 by Vitaly Vewnov."
-	.DB 10
-;	.DB " Марта 24 числа 1997г. от Р.Х."
-	.DB " э┴╥╘┴ 24 ▐╔╙╠┴ 1997╟. ╧╘ Є.ш."
-	.DB 10,27,'a'
-;	.DB "Модификация 6.04.2022г., Impro"
-	.DB "э╧─╔╞╔╦┴├╔╤ 6.04.2022╟., Impro"
-	.DB "ver",10,'$'
 STR1:;	.DB 10,"Квази-диск отформатирован.$"
 	.DB 10,"ы╫┴┌╔-─╔╙╦ ╧╘╞╧╥═┴╘╔╥╧╫┴╬.$"
 STR2:;	.DB 10,"Форматирование диска C:.$"
@@ -505,4 +485,10 @@ STRHDD:;.DB 10,"Инициализация HDD...$"
 	.DB 10,"щ╬╔├╔┴╠╔┌┴├╔╤ HDD...$"
 STRHDE:;.DB 10,"Ошибка !$"
 	.DB 10,"я█╔┬╦┴ !$"
+DMA:	.DW	0
+WSECT:	.DB	0
+FILE0:	.DB 0,"RDS     COM"	; или OS.COM после форматирования КД
+FILE1:	.DB 0,"COMMAND SYS"
+FILE2:	.DB 0,"RDS     SYS"
+;
 OS:	.END
