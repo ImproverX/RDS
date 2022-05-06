@@ -16,8 +16,8 @@
 | loaderkd          |9400h..947Fh|
 | ccph              |9480h..9FFFh|
 | bdos              |A000h..ADFFh|
-| bios (b7h)        |AE00h..BE75h|
-| _(нули)_          |BE76h..BE97h|
+| bios (b7h)        |AE00h..BE78h|
+| _(нули)_          |BE79h..BE97h|
 | надпись 1 "РДС..."|BE98h..BF5Fh|
 | надпись 2 "РДС..."|BF60h..BFFFh|
 | шрифт             |C000h..C9FFh|
