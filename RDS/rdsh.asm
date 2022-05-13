@@ -10,9 +10,9 @@ WRITE:	.EQU	0FB2AH
 READ:	.EQU	0FB27H
 ;OS:	.EQU	400H
 DISKS:	.EQU	0AE46H		; количество дисковых устройств -1
-STRA:	.EQU	0BF60H+1	; ссылка на надпись в загрузчике
+STRA:	.EQU	0BF66H+1	; ссылка на надпись загрузчика
 DMARK:	.EQU	STRA+62h
-STR0:	.EQU	0BE98h		; ссылка на первую надпись РДС
+STR0:	.EQU	0BEA4h		; ссылка на первую надпись РДС
 LCOM:	.EQU	0B80h		; размер файла ccph.obj
 LLDR:	.EQU	0080h		; размер файла loaderkd.obj
 #ifdef NoPACK
@@ -69,42 +69,9 @@ FIL0:	STAX	D
 	LXI	D,STR2	; "Форматирование..."
 	MVI	C,9
 	CALL	5
-	LXI	H,80H
-FORM10:	MVI	M,0E5H
-	INR	L
-	JNZ	FORM10
-	LXI	B,80H
-	CALL	SETDMA
-	MVI	C,2
-	CALL	SELDSK
-	LXI	D,0EB08h ; начальное значение, D=235 (трек), E=8 (сектор)
-FORM11:	PUSH	D
-	MOV	C,D
-	CALL	SETTRK
-	POP	D
-FORM12:	PUSH	D
-	MOV	C,E
-	CALL	SETSEC
-	CALL	WRITE
-	POP	D
-	DCR	E
-	JNZ	FORM12	; цикл по секторам 8..1
-	MVI	E,8
-	DCR	D
-	MOV	A,D
-	CPI	180
-	JC	FORM11	; < 180
-	INR	A	;CPI	0FFh
-	JZ	FORMOK	; >>>
-	CPI	197
-	JNC	FORM11	; >= 196
-	MVI	D,179	;SUI	10h
-			;MOV	D,A
-	JMP	FORM11	; цикл с пропуском треков 180-195
-;
-FORMOK:	LXI	D,STR1	; "КД отформатирован"
-	MVI	C,9
-	CALL	5
+	LXI	D,0202h	; D=02 -- диск C:, E=02 -- форматирование
+	LXI	B,0080H	; вызов функции "Тест квазидиска"
+	CALL	5	; форматирование КД
 	LXI	H,FILE0+1
 	MVI	M,'O'
 	INX	H
@@ -121,7 +88,7 @@ EXIT:	MVI	E,2	;
 	LXI	D,0C308h ; начальное значение, D=195 (трек), E=8 (сектор)
 REP11:	PUSH	D
 	MOV	C,D
-	CALL	SETTRK
+	CALL	SETTRK	; для КД старший байт (B) не важен
 	POP	D
 REP12:	PUSH	D
 	MOV	C,E
@@ -161,7 +128,7 @@ SRDS:	MVI	A,0	; сколько секторов (по 128 байт)
 ;	MVI	C,2	; КД
 ;	CALL	SELDSK
 	MVI	C,0	; трек 0
-	CALL	SETTRK
+	CALL	SETTRK	; для КД старший байт (B) не важен
 	CALL	FIND	; поиск записи (с исправлением)
 	JNZ	SKP1	; найдено -- пропускаем трек 1
 	MVI	C,1	; трек 1
@@ -194,7 +161,7 @@ INIHDD:	LXI	D,STRHDD	;"Инициализация HDD...$"
 	CALL	SETDMA
 	MVI	A,2
 	STA	3FH
-	LXI	B,04F1h	; B=4 (счётчик), C=0F0h+1 (НЖМД, сектор 1 CP/M) или C=0
+	LXI	B,04F1h	; B=4 (счётчик), C=0F0h+1 (НЖМД, +сектор 1 CP/M) или C=0
 INIH10:	PUSH	B
 	CALL	SELDSK
 	MVI	C,0	; или 2
@@ -477,8 +444,6 @@ ManyLiterals:
 	mov b,m
 	jmp CopyLiterals_UseC
 #endif
-STR1:;	.DB 10,"Квази-диск отформатирован.$"
-	.DB 10,"ы╫┴┌╔-─╔╙╦ ╧╘╞╧╥═┴╘╔╥╧╫┴╬.$"
 STR2:;	.DB 10,"Форматирование диска C:.$"
 	.DB 10,"ц╧╥═┴╘╔╥╧╫┴╬╔┼ ─╔╙╦┴ C:.$"
 STRHDD:;.DB 10,"Инициализация HDD...$"
