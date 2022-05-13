@@ -1,7 +1,7 @@
 	.ORG    00100h
 INITCN:	.EQU	0CA00H
 DISKS:	.EQU	0AE46H	; количество дисковых устройств -1
-L_0160:	.EQU	0BF60H	; надпись при загрузке ОС
+L_0160:	.EQU	0BF66H	; надпись при загрузке ОС
 DMARK:	.EQU	L_0160+99
 ;
 L_0100: LXI  SP,00080h
@@ -11,7 +11,7 @@ L_0100: LXI  SP,00080h
         CALL    INITCN
         EI
 	CALL	TDSK	; тест наличия КД11
-	STA	DISKS
+	STA	DISKS	; сохраняем количество дисков в системе
 	CPI	3
 	MVI  A, 44h	; ='D'
 	JZ	L_DONE
