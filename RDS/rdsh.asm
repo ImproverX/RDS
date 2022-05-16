@@ -24,7 +24,10 @@ RDS:	.EQU	OS		; начало архива
 COM:	.EQU	0A000H-LCOM
 LDR:	.EQU	COM-LLDR	; туда будут распакованы данные
 #endif
-TDSK:	.EQU	LDR+38h		; ПП проверки наличия КД11
+TDSK:	.EQU	LDR+5Eh		; ПП проверки наличия КД11 (loaderkd)
+STAUB:	.EQU	LDR+3Ah		; запуск системы из лоадера
+L_BUFT:	.EQU	0D7F3h		; "AUTOEXEC..." для БУФ (в virt)
+M_E000:	.EQU	0E000H		; БУФ для запуска AUTOEXEC.BAT (31 байт)
 ;
 	LXI	SP,80H
 ;;	JMP	START
@@ -139,20 +142,26 @@ SKP1:	CALL	WRITE	; сохраняем каталог
 ;
 	CALL	TDSK	; тест наличия КД11
 	STA	DISKS	; сохраняем количество устройств
-	CPI	3
+;	CPI	3
 	JZ	SKP2
 	MVI  A, 20h	; =" "
 	STA	DMARK	; затираем букву "D"
-SKP2:	CALL	INIHDD	;<<<
-	MVI	C,13	; сброс дисков
-	CALL	5
+SKP2:	LXI  H, L_BUFT	; ссылка на данные для БУФ (AUTOEXEC.BAT)
+	LXI  D, M_E000	; куда копировать (БУФ)
+	PUSH D		; сохр.в стек
+BUFLP:	MOV  A, M
+	STAX D
+	INX  H
+	INX  D
+	ANA  A		; признаки по А
+	JNZ     BUFLP	; цикл, пока А не обнулится
+	CALL	INIHDD	;<<<
 	MVI	E,10	; <ПС>
 	MVI	C,2
 	CALL	5
 	LXI	D,STRA	; надпись РДС в прямоугольнике
-	MVI	C,9
-	CALL	5
-	JMP	0	; >>>>>>>>>>>>>>>>> запуск системы
+	JMP	STAUB	; >>>>>>>>>>>>>>>>> запуск системы (через loaderkd)
+;	JMP	0
 ;
 INIHDD:	LXI	D,STRHDD	;"Инициализация HDD...$"
 	MVI	C,9
@@ -176,12 +185,16 @@ INIH10:	PUSH	B
 	JNZ	INIH10	; цикл, 4 попытки
 	XRA	A
 	STA	3FH
+	STA	04h	; номер диска 0 (A:) для SETHDD
 	LXI	D,STRHDE	; "Ошибка"
 	MVI	C,9
 	CALL	5
 	LXI	D,0
 	LXI	B,0F80H	; SETHDD -- Установка номера 0 дискеты HDD
-	JMP	5
+	CALL	5
+	MVI	A,2
+	STA	04h	; восстанавливаем номер диска
+	RET
 ;
 INIH12:	DI		; занесение характеристик НЖМД в БСВВ
 	XRA	A
