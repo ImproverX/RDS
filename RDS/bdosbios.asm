@@ -4,7 +4,7 @@
 ; перекрёстных ссылок и в памяти они расположены друг за другом
 ;
 #DEFINE VERSION "3.07"
-#DEFINE DMODIFIC "12.05.2022"
+#DEFINE DMODIFIC "16.05.2022"
 ;
 #include "bdos.inc"
 #include "b7h.inc"
