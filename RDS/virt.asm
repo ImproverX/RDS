@@ -471,6 +471,10 @@ ALVB:	.DS	51	; <=
 ALVC:	.DS	33	; <=
 ALVD:	.DS	33	; <=
 ;
+	.org 0FF73h
+L_BUFT:	.db 003h		; байт, определяющий диск (3 == C:)
+	.db "AUTOEXECBAT"	; имя файла
+;	.db 000h
 #ifndef NoPACK
 	.org 01077Fh	; выравнивание размера
 #else
