@@ -25,7 +25,7 @@ COM:	.EQU	0A000H-LCOM
 LDR:	.EQU	COM-LLDR	; туда будут распакованы данные
 #endif
 TDSK:	.EQU	LDR+5Eh		; ПП проверки наличия КД11 (loaderkd)
-STAUB:	.EQU	LDR+3Ah		; запуск системы из лоадера
+STAUB:	.EQU	LDR+2Eh		; запуск системы из лоадера
 L_BUFT:	.EQU	0D7F3h		; "AUTOEXEC..." для БУФ (в virt)
 M_E000:	.EQU	0E000H		; БУФ для запуска AUTOEXEC.BAT (31 байт)
 ;
@@ -57,10 +57,10 @@ FIL0:	STAX	D
 	CALL	unlzsa1		; распаковка
 #endif
 	CALL	STDISP		; (0CA00H)
-	LXI	H,0E4F2h	; ='РД'
-	SHLD	11
-	LXI	H,30F3H		; ='С' 3.0
-	SHLD	13
+;	LXI	H,0E4F2h	; ='РД'		>> перенесено в лоадер
+;	SHLD	11
+;	LXI	H,30F3H		; ='С' 3.0
+;	SHLD	13
 	LXI	SP,0
 	EI
 	LXI	D,STR0
