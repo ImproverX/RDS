@@ -19,4 +19,4 @@ if ERRORLEVEL 1 pause
 
 copy /b loaderkd.obj+ccph.obj+bdosbios.obj+font.bin+disp.obj+vird7.obj+virt.obj pack1.bin
 lzsa -f1 -r pack1.bin pack1.pak
-copy /b rdsh.obj+pack1.pak rds307.rom
+copy /b rdsh.obj+pack1.pak rds308.rom
