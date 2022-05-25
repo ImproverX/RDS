@@ -6,12 +6,12 @@ DMARK:	.EQU	L_0160+99
 L_BUFT:	.EQU	0D7F3h	; "AUTOEXEC..." для БУФ (в virt)
 M_E000:	.EQU	0E000H	; БУФ для запуска AUTOEXEC.BAT (31 байт)
 ;
-L_0100: LXI  SP,00080h
-        DI
-        MVI  A, 020h	; 0010 0000b -- банк 3 как ОЗУ A000-DFFFh
-        OUT     010h
-        CALL    INITCN
-        EI
+L_0100:	LXI  SP,00080h
+	DI
+	MVI  A, 020h	; 0010 0000b -- банк 3 как ОЗУ A000-DFFFh
+	OUT     010h
+	CALL    INITCN
+	EI
 	CALL	TDSK	; тест наличия КД11
 	STA	DISKS	; сохраняем количество дисков в системе
 	MVI  A, 44h	; ='D'
@@ -27,15 +27,15 @@ BUFLP:	MOV  A, M
 	INX  D
 	ANA  A		; признаки по А
 	JNZ     BUFLP	; цикл, пока А не обнулится
-        LXI  H, 0E4F2h	; ='РД'
-        SHLD    0000Bh
-        LXI  H, 030F3h	; ='С3'
-        SHLD    0000Dh
 	LXI  D, L_0160	; надпись РДС в прямоугольнике
-STAUB:	MVI  C, 009h	; <<- переход из rdsh
-        CALL    5	; вывод
-        MVI  C, 00Dh	; сброс дисков
-        CALL    5	; <<!! тут выдаёт ошибку при отсутствии НГМД и НЖМД
+STAUB:	LXI  H, 0E4F2h	; ='РД'		<<- переход из rdsh
+	SHLD    0000Bh
+	LXI  H, 030F3h	; ='С' 3.0
+	SHLD    0000Dh
+	MVI  C, 009h
+	CALL    5	; вывод надписи
+	MVI  C, 00Dh	; сброс дисков
+	CALL    5	; <<!! тут выдаёт ошибку при отсутствии НГМД и НЖМД
 	POP  D		; адрес БУФ из стека
 	LXI  H, 0000h
 	SHLD	0080h	; параметры запуска (пустые)
