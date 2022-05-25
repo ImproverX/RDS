@@ -422,8 +422,8 @@ INVTAB:	.DW INV0,INV2,INV4,INV6,INV8,INVA,INVC,INVE
 ;
 ZAGA:	.DW 0,0,0,0,DIRB,PARA,CSVA,ALVA
 ZAGB:	.DW 0,0,0,0,DIRB,PARB,CSVB,ALVB
-ZAGC:	.DW 0,0,0,0,DIRB,PARC,0,ALVC
-ZAGD:	.DW 0,0,0,0,DIRB,PARD,0,ALVD
+ZAGC:	.DW 0,0,0,0,DIRB,PARK,0,ALVC
+ZAGD:	.DW 0,0,0,0,DIRB,PARK,0,ALVD
 ; 00 адрес таблицы трансляции логических секторов в физические (передается функции SECTRAN в DE) или 0 если трансляция не нужна
 ; 01 просто ноль
 ; 02 просто ноль
@@ -439,12 +439,9 @@ PARA:	.DW 40
 PARB:	.DW 40
 	.DB 4,15,0
 	.DW 187H,127,0C0H,32,8
-PARC:	.DW 8
+PARK:	.DW 8
 	.DB 3,7,0
 	.DW 235,63,0C0H,0,0	; 219...
-PARD:	.DW 8
-	.DB 3,7,0
-	.DW 235,63,0C0H,0,0
 ; Параметры диска:
 ; DW SPT - количество секторов (по 128 байт) на дорожку;
 ; DB BSH - количество бит, на которое необходимо сдвинуть размер логического сектора, чтобы получить размер кластера
