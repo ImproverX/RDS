@@ -27,9 +27,9 @@ FONTP:	.DW	TFONT	; +14h
 BORD:	.DB	10H	; +18h
 SCROLL:	.DB	-1	; +19h
 KEYS:	.DB	-1	; +1Ah
-RUSLT:	.DB	-1	; +1Bh
-MODKEY:	.DB	1,1	; +1Ch
-PORT1:	.DB	6	; +1Eh
+RUSLT:	.DB	-1	; +1Bh	; больше не используется, оставлено для совместимости
+MODKEY:	.DB	1,1	; +1Ch	; РУС, СС
+PORT1:	.DB	6	; +1Eh	; A6h=РУС, 06h=ЛАТ, 46h=СС+ЛАТ, E6h=СС+РУС
 KEYCNT:	.DB	0	; +1Fh
 KEYINC:	.DB	0	; +20h
 KEYPNT:	.DB	0	; +21h
@@ -245,10 +245,10 @@ INBYT:	PUSH	D
 	MVI	C,0
 	MOV	D,A
 	IN	1
-	ANI	10H
+	ANI	10H	; МГ
 	MOV	E,A
 INB10:	IN	1
-	ANI	10H
+	ANI	10H	; МГ
 	CMP	E
 	JZ	INB10
 	RLC
@@ -260,7 +260,7 @@ INB10:	IN	1
 	MOV	C,A
 	CALL	WAITI
 	IN	1
-	ANI	10H
+	ANI	10H	; МГ
 	MOV	E,A
 	MOV	A,D
 	ANA	A
@@ -882,41 +882,33 @@ DYSP02:	MVI	A,8AH
 	XRA	A
 	OUT	3
 	IN	2
-	INR	A
-	MOV	C,A
-	IN	1
-	ANI	0A0H	; выделяем СС и РУС
-	MOV	B,A
-	LXI	H,RUSLT
-	SUB	M
-	ORA	C
-	JZ	DYSP15
-	LXI	H,MODKEY
-	MOV	A,B
-	ANI	80H
-	MVI	E,0A0H
-	CALL	DYSP12
-	INX	H
-	MOV	A,B
-	ANI	20H
-	MVI	E,40H
-	CALL	DYSP12
-	LXI	B,0FE08H
-	LXI	D,800H
-DYSP14:	MOV	A,B
-	OUT	3
+	INR	A	; если нет нажатых кнопок, то A = FFh
+	JZ	DYSP15	; нет нажатых кнопок
+	LXI	B,000FEh; C - маска для клавиатуры, B - номер столбца
+	MOV	A,C
+DYSP14:	OUT	3
 	IN	2
 	CPI	-1
-	JNZ	DYSP20
-	MOV	A,E
-	ADD	D
-	MOV	E,A
-	MOV	A,B
+	JNZ	DYSP19	; >> найдена нажатая клавиша
+	INR	B
+	MOV	A,C
 	RLC
-	MOV	B,A
-	DCR	C
-	JNZ	DYSP14
-DYSP15:	CALL	DYSP89
+	MOV	C,A
+	JC	DYSP14	; цикл чтения матрицы клавиатуры
+	XRA	A
+DYSP15:	MOV	E,A	; E=00h -- нет нажатых клавиш или [код клавиши +1]
+	IN	1	; !!! (1) !!!
+	ANI	0A0H	; выделяем СС и РУС
+	MOV	D,A	; результат в D
+	LXI	H,MODKEY
+	LXI	B,080A0h; B=80h (выделяем РУС), C=A0h (для PORT1)
+	CALL	DYSP12	; >>
+	INX	H	; MODKEY+1
+	LXI	B,02040h; B=20h (выделяем СС), C=40h (для PORT1)
+	CALL	DYSP12	; >>
+	CALL	DYSP89	; индикатор РУС/ЛАТ и восст.режима ВВ55А
+	DCR	E	; E = код клавиши
+	JP	DYSP21	; >> S=0, если код < 80h (были нажатые клавиши)
 	XRA	A
 	STA	POVTK
 	CMA
@@ -927,35 +919,42 @@ DYSP99:	POP	PSW
 	POP	H
 	RET
 ;
-DYSP12:	JNZ	DYSP13
+DYSP12:	MOV	A,D
+	ANA	B	; выделяем РУС/CC
+	JNZ	DYSP13	; >> не РУС (или СС)
 	ORA	M
 	MVI	M,0
-	RZ
-	MOV	A,C
+	RZ		; >> MODKEY было = 0 и нажата РУС (или СС)
+	MOV	A,E
 	ANA	A
-	RNZ
+	RNZ		; >> есть нажатые кнопки
 	MVI	M,2
 	RET
 ;
 DYSP13:	DCR	M
 	MVI	M,1
-	RZ
-	RM
-	LDA	PORT1
-	XRA	E
+	RZ		; >> MODKEY было = 1
+	RM		; >> MODKEY было = 0,81h..FFh
+	LDA	PORT1	;    MODKEY было = 2..80h
+	XRA	C	; инвертируем нужные биты
 	STA	PORT1
 	RET
 ;
-DYSP20:	RAR
-	JNC	DYSP21
-	INR	E
-	JMP	DYSP20
+DYSP19:	MVI	C,0	; вычисление кода клавиши
+DYSP20:	INR	C
+	RAR
+	JC	DYSP20
+	MOV	A,B
+	ADD	A
+	ADD	A
+	ADD	A	; столбец * 8
+	ADD	C	; + строка
+	JMP	DYSP15	; A= код клавиши +1
 ;
-DYSP21:	CALL	DYSP89
-	LXI	H,DYSP30
+DYSP21:	LXI	H,DYSP30
 	PUSH	H
-	IN	1
-	ANI	60H	;
+	IN	1	; <- проверка УС и СС при нажатии клавиш
+	ANI	60H	; выделяем УС и СС
 	MOV	B,A
 	MOV	A,E
 	CPI	3FH
@@ -998,7 +997,7 @@ DYSP25:	MOV	A,B
 	ANI	20H
 	MOV	B,A
 	LDA	PORT1
-	ANI	40H
+	ANI	40H	; СС
 	ORA	B
 	MOV	A,E
 	JPO	DYSP26
@@ -1068,11 +1067,11 @@ DYSP34:	CPI	40H
 	INR	A
 	JM	DYSP35
 	LDA	PORT1
-	ANI	0A0H
+	ANI	0A0H	; РУС
 	XRA	B
 	MOV	B,A
-	IN	1
-	RLC
+	IN	1	; <- проверка РУС при нажатии клавиш
+	RLC		; РУС в признак С
 	JC	DYSP35
 	MOV	A,B
 	XRI	0A0H
@@ -1102,14 +1101,14 @@ DYSP89:	MVI	A,88H
 	OUT	3
 	LDA	BORD
 	OUT	2
-	LDA	PORT1
-PORT1O:	CPI	0
-DYSP8A:	JZ	MIG0
-	STA	PORT1O+1
+	LDA	PORT1	; !!!
+PORT1O:	CPI	0	; <- значение меняется
+DYSP8A:	JZ	MIG0	; >>> (адрес меняется)
+	STA	PORT1O+1; ->
 	RLC
-	RLC
-	ANI	3
-	ADD	A
+	RLC		; Х001 10[РУС][СС]
+	ANI	3	; 0000 00[РУС][СС]
+	ADD	A	; *2
 	LXI	H,MIGT
 	MOV	C,A
 	MVI	B,0
@@ -1118,22 +1117,22 @@ DYSP8A:	JZ	MIG0
 	INX	H
 	MOV	H,M
 	MOV	L,A
-	SHLD	DYSP8A+1
+	SHLD	DYSP8A+1; -> меняем адрес ПП
 	PCHL
 ;
-MIG1:	LXI	H,MIGCN
+MIG1:	LXI	H,MIGCN ; мигалка ЛАТ+СС
 	DCR	M
-	JNZ	MIG0
+	JNZ	MIG0	; >>
 	MVI	M,16
-MIG2:	MVI	A,8
+MIG2:	MVI	A,8	; включение РУС
 	OUT	1
 	RET
 ;
-MIG3:	LXI	H,MIGCN
+MIG3:	LXI	H,MIGCN ; мигалка РУС+СС
 	DCR	M
-	JNZ	MIG2
+	JNZ	MIG2	; >>
 	MVI	M,4
-MIG0:	XRA	A
+MIG0:	XRA	A	; выключение РУС
 	OUT	1
 	RET
 ;
@@ -1233,8 +1232,7 @@ TMASC:	.DB 0E0H,0,70H,0,38H,0,1CH,0
 	.DB 0EH,0,7,0,3,080H,1,0C0H
 DRTAB:	.DS	16
 INVTAB:	.DS	15	;<-16
-	.db 0
 ;
-;	.org 0D37Fh	; выравнивание размера
-;	.db 0
+	.org 0D2FFh	; выравнивание размера
+	.db 0
 	.END
