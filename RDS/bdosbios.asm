@@ -3,8 +3,8 @@
 ; BDOS и BIOS, компилируются одновременно, т.к. в них много
 ; перекрёстных ссылок и в памяти они расположены друг за другом
 ;
-#DEFINE VERSION "3.07"
-#DEFINE DMODIFIC "16.05.2022"
+#DEFINE VERSION "3.08"
+#DEFINE DMODIFIC "25.05.2022"
 ;
 #include "bdos.inc"
 #include "b7h.inc"
