@@ -66,46 +66,46 @@ CPM:	XCHG		; (AA011)
 	XCHG
 	PCHL
 TA047:	.DW	COLD	; 0	(CBIOS)
-	.DW	AA2C8	; 1
-	.DW	BDPRNT	; 2	(AA190)
-	.DW	AA2CE	; 3
-	.DW	PUTCH	; 4
-	.DW	LST	; 5
-	.DW	AA2D4	; 6
-	.DW	AA2ED	; 7
-	.DW	AA2F3	; 8
-	.DW	AA2F8	; 9
+	.DW	AA2C8	; 1	Ввод с консоли
+	.DW	BDPRNT	; 2	Вывод на консоль (AA190)
+	.DW	AA2CE	; 3	? Ввод с дополнительного устройства ввода
+	.DW	PUTCH	; 4	? Вывод на дополнительное устройство вывода
+	.DW	LST	; 5	Вывод на печать
+	.DW	AA2D4	; 6	Прямой обмен с консолью
+	.DW	AA2ED	; 7	? Опрос состояния дополнительного устройства ввода
+	.DW	AA2F3	; 8	? Опрос состояния дополнительного устройства вывода
+	.DW	AA2F8	; 9	вывод последовательности символов ("...$")
 	.DW	AA1E1	; 10	ввод строки
-	.DW	AA2FE	; 11
-	.DW	AAC7E	; 12
+	.DW	AA2FE	; 11	Получение состояния консоли
+	.DW	AAC7E	; 12	Возврат версии системы (=22h)
 	.DW	AAC83	; 13	сброс дисковой системы
-	.DW	AAC45	; 14
-	.DW	AAC9C	; 15
-	.DW	AACA5	; 16
-	.DW	AACAB	; 17
-	.DW	AACC8	; 18
-	.DW	AACD7	; 19
-	.DW	AACE0	; 20
-	.DW	AACE6	; 21
-	.DW	AACEC	; 22
-	.DW	AACF5	; 23
-	.DW	AACFE	; 24
-	.DW	AAD04	; 25
-	.DW	AAD0A	; 26
-	.DW	AAD11	; 27
-	.DW	AA52C	; 28
-	.DW	AAD17	; 29
-	.DW	AAD1D	; 30
-	.DW	AAD26	; 31
-	.DW	AAD2D	; 32
-	.DW	AAD41	; 33
-	.DW	AAD47	; 34
-	.DW	AAD4D	; 35
-	.DW	AAC0E	; 36
-	.DW	AAD53	; 37
-	.DW	AA304	; 38
-	.DW	AA304	; 39
-	.DW	AAD9B	; 40
+	.DW	AAC45	; 14	? Выбор диска
+	.DW	AAC9C	; 15	? Открытие файла
+	.DW	AACA5	; 16	? Закрытие файла
+	.DW	AACAB	; 17	? Поиск первого файла
+	.DW	AACC8	; 18	? Поиск следующего входа
+	.DW	AACD7	; 19	? Удаление файла
+	.DW	AACE0	; 20	? Последовательное чтение
+	.DW	AACE6	; 21	? Последовательная запись
+	.DW	AACEC	; 22	? Создание файла
+	.DW	AACF5	; 23	? Переименование файла
+	.DW	AACFE	; 24	? Получение вектора состояния дисков
+	.DW	AAD04	; 25	? Получение текущего диска
+	.DW	AAD0A	; 26	? Установка адреса буфера ПДП
+	.DW	AAD11	; 27	? Получить адрес вектора распределения
+	.DW	AA52C	; 28	? Установка защиты записи
+	.DW	AAD17	; 29	? Получение вектора защиты записи
+	.DW	AAD1D	; 30	? Установка атрибутов файла
+	.DW	AAD26	; 31	? Получение адреса блока параметров диска
+	.DW	AAD2D	; 32	? Получение/установка кода пользователя
+	.DW	AAD41	; 33	? Произвольное чтение
+	.DW	AAD47	; 34	? Произвольная запись
+	.DW	AAD4D	; 35	? Получение размера файла
+	.DW	AAC0E	; 36	? Установка номера произвольной записи
+	.DW	AAD53	; 37	? Сброс диска
+	.DW	AA304	; 38	?
+	.DW	AA304	; 39	?
+	.DW	AAD9B	; 40	? Произвольная запись с заполнением нулями
 ;
 AA099:	LXI	H,TA0CA	; "Bad sector"
 	CALL	AA0E5
@@ -509,7 +509,7 @@ DA343:	.DW	00000H	; ссылка на буфер командной строки
 DA345:	.DB	000H
 	.DB	000H
 ;
-AA347:	LXI	H,TA00B
+AA347:	LXI	H,TA00B	; "Select"
 AA34A:	MOV	E,M
 	INX	H
 	MOV	D,M
@@ -1850,14 +1850,14 @@ BDSLDS:	LHLD	DADAF	; (AAC21) << вызов из b7h
 	XCHG
 	CALL	AA359	; установка диска № CURDSK (DA342)
 	POP	H
-	CZ	AA347	; >> вывод ошибки
+	CZ	AA347	; >> вывод ошибки выбора диска
 	MOV	A,L
 	RAR
-	RC
+	RC		; >>
 	LHLD	DADAF
 	MOV	C,L
 	MOV	B,H
-	CALL	AA50B
+	CALL	AA50B	;
 	SHLD	DADAF
 	JMP	AA6A3
 ;
@@ -1900,7 +1900,7 @@ AAC83:	LXI	H,00000H	; сброс дисков
 	STA	CURDSK	; (DA342)
 	LXI	H,00080H
 	SHLD	BDDAT	; (DADB1)
-	CALL	AA5DA
+	CALL	AA5DA	; ... setdma(0080h)
 	JMP	BDSLDS	; (AAC21)
 ;
 AAC9C:	CALL	AA572
@@ -2043,8 +2043,8 @@ AAD9B:	CALL	AAC51
 	RET
 ;
 TADAC:	.DB	0E5H
-DADAD:	.DW	00000H
-DADAF:	.DW	00000H
+DADAD:	.DW	00000H	; вектор защиты от записи, биты соотв.дискам [PONMLKJI HGFEDCBA]
+DADAF:	.DW	00000H	; вектор состояния дисков, биты соотв. [PONMLKJI HGFEDCBA]
 BDDAT:	.DW	00080H	; (DADB1)
 DADB3:	.DW	00000H
 DADB5:	.DW	00000H
