@@ -898,7 +898,6 @@ DYSP14:	OUT	3
 	XRA	A
 DYSP15:	MOV	E,A	; E=00h -- нет нажатых клавиш или [код клавиши +1]
 	IN	1	; !!! (1) !!!
-	ANI	0A0H	; выделяем СС и РУС
 	MOV	D,A	; результат в D
 	LXI	H,MODKEY
 	LXI	B,080A0h; B=80h (выделяем РУС), C=A0h (для PORT1)
