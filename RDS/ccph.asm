@@ -1,4 +1,4 @@
-;(перед компилированием преобразовать в CP866)
+;(перед компилированием преобразовать в KOI-8R)
 	.ORG	0EF80H
 	.DB	0h,0F0h,0h,0F0h,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah
 	.DB	1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah,1Ah
@@ -20,10 +20,8 @@ LNBUF:	.DB	000H
 COMSTR:	.DB "              "
 	.DB "COPYRIGHT (C) 1979, DIGITAL RES"
 	.DB "EARCH  "
-;	.DB "Переработано Вьюновым В.А. в 19"
-	.DB "Ё┼╥┼╥┴┬╧╘┴╬╧ ў╪└╬╧╫┘═ ў.с. ╫ 19"
-;	.DB "96 году. "
-	.DB "96 ╟╧─╒. "
+	.DB "Переработано Вьюновым В.А. в 19"
+	.DB "96 году. "
 	.DB "Copyright (c) 1996 by Vewnov Vi"
 	.DB "taly."
 BUFDEC:	.DW	0
@@ -382,8 +380,10 @@ AF509:	DCR	C
 	MOV	A,B
 	ORA	A
 	RET
+;
 TF510:	.DB "DIR ERA TYPESAVEREN USERTEST"
 	.DB "RESTHDD "
+;
 BUILD:	LXI	H,TF510
 	MVI	C,0
 AF533:	MOV	A,C
@@ -594,10 +594,14 @@ HEXOUT:	PUSH	PSW
 ;
 AF5D9:	LXI	B,TF5DF
         JMP     PRINT
+;
 TF5DF:	.DB "READ ERROR",0
+;
 AF5EA:	LXI	B,TF5F0
         JMP     PRINT
-TF5F0:	.DB	"NO FILE",0
+;
+TF5F0:	.DB "NO FILE",0
+;
 AF5F8:	CALL	DECOD
 	LDA	UDISK
 	ORA	A
@@ -830,12 +834,11 @@ DES12:	PUSH	H
 DES14:	POP	H
 	MOV	A,E
 	JMP	DES02
-STRDR0:;.DB 27,62H,9,9,"Занято - ",0
-	.DB 27,62H,9,9,"·┴╬╤╘╧ - ",0
-STRDR1:;.DB "КБ, свободно - ",0
-	.DB "ыт, ╙╫╧┬╧─╬╧ - ",0
-STRDR2:;.DB "КБ.",9,9,9,27,61H,0
-	.DB "ыт.",9,9,9,27,61H,0
+;
+STRDR0:.DB 27,62H,9,9,"Занято - ",0
+STRDR1:.DB "КБ, свободно - ",0
+STRDR2:.DB "КБ.",9,9,9,27,61H,0
+;
 ERA:	CALL	DECOD
 	CPI	00BH
 	JNZ	AF742
@@ -860,6 +863,7 @@ AF742:	CALL	AF654
 ;
 ; >> NO EXECUTION PATH TO HERE <<
 TF752:	.DB "ALL (Y/N)?",0
+;
 TYPE:	CALL	DECOD
 	JNZ	BADCOM
 	CALL	AF654
@@ -940,6 +944,7 @@ AF801:	CALL	SYSDMA
 ;
 ; >> NO EXECUTION PATH TO HERE <<
 TF807:	.DB "NO SPACE",0
+;
 REN:	CALL	DECOD
 	JNZ	BADCOM
 	LDA	UDISK
@@ -993,6 +998,7 @@ AF879:	LXI	B,TF882
 ;
 ; >> NO EXECUTION PATH TO HERE <<
 TF882:	.DB "FILE EXISTS",0
+;
 USER:	CALL	AF5F8
 	CPI	010H
 	JNC	BADCOM
@@ -1214,6 +1220,7 @@ AF971:	LXI	B,TF97A
 TF97A:	.DB	"BAD LOAD",0
 ECOM:	.DB	"COM"
 EBAT:	.DB	"BAT"
+;
 AF986:	CALL	AF666
 KONEC:	CALL	DECOD
 	LDA	CBUF+1
