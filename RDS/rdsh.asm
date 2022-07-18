@@ -460,7 +460,7 @@ ManyLiterals:
 ;
 STR2:	.DB 10,"Форматирование диска C:.$"
 STRHDD:	.DB 10,"Инициализация HDD...$"
-STRHDE:	.DB 10,"Ошибка !$"
+STRHDE:	.DB " не найден.$"
 DMA:	.DW	0
 WSECT:	.DB	0
 FILE0:	.DB 0,"RDS     COM"	; или OS.COM после форматирования КД
