@@ -341,49 +341,49 @@ PRNT01:	LXI	H,ESCCNT
 	CPI	60H
 	JZ	ESC210
 	CPI	40H
-	JZ	ESCCLR
+	JZ	ESCCLR	; изменить палитру
 	CPI	28H
 	JZ	PRC162
 	CPI	20H
 	JZ	PRNC09
 ;	JMP	ESC00
-ESC00:	CPI	1
+ESC00:	CPI	1	; АР2-последовательности (1Bh + ...)
 	JNZ	ESC84
 	MOV	A,C
 	CPI	80H
 	JNC	ESC80
 	CPI	'a'
-	JZ	ESC02
+	JZ	ESC02	; отключить вывод символов в негативе
 	CPI	'b'
-	JZ	ESC04
+	JZ	ESC04	; вывод символов в негативе
 	CPI	'6'
-	JZ	ESC04
+	JZ	ESC04	; вывод символов в негативе
 	CPI	'7'
-	JZ	ESC02
+	JZ	ESC02	; отключить вывод символов в негативе
 	CPI	'Y'
-	JZ	ESC06
+	JZ	ESC06	; перемещение курсора
 	CPI	'T'
-	JZ	ESC06
+	JZ	ESC06	; перемещение курсора
 	CPI	'E'
-	JZ	ESC21
+	JZ	ESC21	; сброс экрана
 	CPI	'J'
-	JZ	ESC20
+	JZ	ESC20	; стирание экрана
 	CPI	'H'
-	JZ	ESC200
+	JZ	ESC200	; курсор в лев.верх угол без стирания
 	CPI	'K'
 	JZ	PRNC16
 	CPI	'^'
 	JZ	ESC202
 	CPI	5CH
-	JZ	ESC22
+	JZ	ESC22	; КОИ-7
 	CPI	5BH
-	JZ	ESC24
+	JZ	ESC24	; КОИ-8
 	CPI	2FH
-	JZ	ESC24
+	JZ	ESC24	; КОИ-8
 	CPI	'P'
-	JZ	ESC08
+	JZ	ESC08	; установка цвета
 	CPI	7
-	JZ	ESCBP
+	JZ	ESCBP	; звук нажатия клавиш
 ESC99:	XRA	A
 	STA	ESCCNT
 	JMP	PRNT99
@@ -399,16 +399,16 @@ PRN01T:	MOV	A,C
 ESCFPR:	MVI	M,0
 	JMP	PRNT10
 ;
-ESCBP:	LXI	H,ONBEEP
+ESCBP:	LXI	H,ONBEEP	; звук нажатия клавиш
 	MOV	A,M
 	XRI	1
 	MOV	M,A
 	JMP	ESC99
 ;
-ESC06:	INR	M
+ESC06:	INR	M	; перемещение курсора
 	JMP	PRNT99
 ;
-ESC08:	MVI	M,40H
+ESC08:	MVI	M,40H	; установка цвета
 	JMP	PRNT99
 ;
 ESC80:	INR	M
@@ -449,11 +449,11 @@ ESC16:	MVI	A,79
 	STA	CURX
 	JMP	PRNT99
 ;
-ESC20:	XRA	A
+ESC20:	XRA	A	; стирание экрана
 	STA	ESCCNT
 	JMP	PRNC0C
 ;
-ESC200:	XRA	A
+ESC200:	XRA	A	; курсор в лев.верх угол без стирания
 	STA	ESCCNT
 	JMP	PRNC0B
 ;
@@ -462,24 +462,24 @@ ESC202:	MVI	M,60H
 ;
 ESC210:	MOV	A,C
 	CPI	'C'
-	JZ	ESC04
+	JZ	ESC04	; вывод символов в негативе
 	CPI	'A'
-	JZ	ESC04
+	JZ	ESC04	; вывод символов в негативе
 	CPI	'@'
-	JZ	ESC02
+	JZ	ESC02	; отключить вывод символов в негативе
 	JMP	ESC99
 ;
-ESC21:	XRA	A
+ESC21:	XRA	A	; сброс экрана
 	CALL	SETINV
 	LXI	H,TFONT
 	SHLD	FONTP
 	JMP	ESC20
 ;
-ESC22:	LXI	H,TFONT+16
+ESC22:	LXI	H,TFONT+16	; КОИ-7
 	SHLD	FONTP
 	JMP	ESC99
 ;
-ESC24:	LXI	H,TFONT
+ESC24:	LXI	H,TFONT	; КОИ-8
 	SHLD	FONTP
 	JMP	ESC99
 ;
@@ -491,7 +491,7 @@ PRNC0E:	LXI	H,TFONT+32
 	SHLD	FONTP
 	JMP	PRNT99
 ;
-ESCCLR:	LXI	H,ESCP
+ESCCLR:	LXI	H,ESCP	; изменение палитры 
 	MOV	A,M
 	ANA	A
 	JNZ	ESCCL0
@@ -531,11 +531,11 @@ GETXX:	LDA	CURX
 	STA	XX
 	RET
 ;
-ESC02:	XRA	A	; = NOP
+ESC02:	XRA	A	; = NOP	; отключить вывод символов в негативе
 	CALL	SETINV
 	JMP	ESC99
 ;
-ESC04:	MVI	A,2FH	; = CMA
+ESC04:	MVI	A,2FH	; = CMA	; вывод символов в негативе
 	CALL	SETINV
 	JMP	ESC99
 ;
@@ -707,7 +707,7 @@ PRNC16:	MVI	A,28H
 	STA	ESCCNT
 	LDA	CURX
 	STA	SCURX+1	;>>>
-	MVI	A,0C3H
+	MVI	A,0C3H	; = JMP
 	STA	PRNT13
 	MVI	C,20H
 	JMP	PRNT10
@@ -717,7 +717,7 @@ PRNC16:	MVI	A,28H
 PRC160:	LDA	CURX
 	ANI	7
 	JNZ	PRNT01
-	MVI	A,0DAH
+	MVI	A,0DAH	; = JC
 	STA	PRNT13
 	LDA	YY
 	MOV	C,A
@@ -839,9 +839,9 @@ PRNPAR:	PUSH	H
 	POP	H
 	RET
 ;
-TFONT:	.DW FONT,FONT+320,FONT+640,FONT+960,FONT+1280,FONT+1600
+TFONT:	.DW FONT,FONT+320,FONT+640,FONT+960,FONT+1280,FONT+1600		; КОИ-8
 	.DW FONT+1920,FONT+2240
-	.DW FONT,FONT+320,FONT+640,FONT+2240,FONT+1280,FONT+1600
+	.DW FONT,FONT+320,FONT+640,FONT+2240,FONT+1280,FONT+1600	; КОИ-7
 	.DW FONT+1920,FONT+960
 	.DW FONT,FONT+320,FONT+1920,FONT+2240,FONT+1280,FONT+1600
 	.DW FONT+640,FONT+960
