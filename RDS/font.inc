@@ -1277,7 +1277,7 @@ FONT:	.db 000h	;|        | (offset 0000h)
 	.db 000h	;|        | (offset 04FCh)
 	.db 000h	;|        | (offset 04FDh)
 	.db 000h	;|        | (offset 04FEh)
-	.db 001h	;|       ■| (offset 04FFh) 127 7Fh ""
+	.db 001h	;|       ■| (offset 04FFh) 127 7Fh
 	.db 0E0h	;|■■■     | (offset 0500h)
 	.db 000h	;|        | (offset 0501h)
 	.db 0E0h	;|■■■     | (offset 0502h)
