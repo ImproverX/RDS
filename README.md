@@ -1,5 +1,5 @@
 # RDS
-Дисковая операционная система RDS для ПК Вектор-06ц. Поддерживает квази-диск (с патчем для КД на РУ7), два НГМД и НЖМД. Некоторое описание и документация [для пользователя](https://github.com/ImproverX/RDS/blob/master/manuals/rds-rpol.txt) и [для программиста](https://github.com/ImproverX/RDS/blob/master/manuals/rds-rpro.txt).
+Дисковая операционная система RDS для ПК Вектор-06ц. Поддерживает квази-диски (в том числе КД на РУ7), два НГМД и НЖМД. Некоторое описание и документация [для пользователя](https://github.com/ImproverX/RDS/blob/master/manuals/rds-rpol.txt) и [для программиста](https://github.com/ImproverX/RDS/blob/master/manuals/rds-rpro.txt).
 
 ## Компиляция
 Для сборки из исходников требуется компилятор TASM (Telemark Assembler, либо аналогичный для процессоров i8085) и упаковщик [LZSA](https://github.com/emmanuel-marty/lzsa). Перед компиляцией необходимо все исходники перекодировать из UTF-8 в KOI-8R.<br>
