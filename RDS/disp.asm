@@ -234,11 +234,10 @@ HEXOUT:	MOV	B,A
 	RRC
 	CALL	HEX10
 	MOV	A,B
-HEX10:	ANI	15
-	CPI	10
-	JC	$+5
-	ADI	7
-	ADI	30H
+HEX10:	ORI	0F0h	; по методу ivagor
+	DAA		;
+	CPI	060h	;
+	SBI	01Fh	;
 	MOV	C,A
 	JMP	PRINTC
 ;
