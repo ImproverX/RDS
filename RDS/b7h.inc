@@ -1280,7 +1280,7 @@ NBDSPR:	MOV	C,E
 ;
 NBDOS:	MOV	A,C	; << сюда в итоге прилетает по call 5
 	CPI	2
-	JZ	NBDSPR
+	JZ	NBDSPR	; >> печать символа из E
 	LXI	H,TBTRAP
 NBDS00:	MOV	A,M
 	ANA	A
@@ -1288,7 +1288,7 @@ NBDS00:	MOV	A,M
 	CMP	C
 	INX	H
 	JNZ	NBDS00	; цикл
-	MOV	A,D
+	MOV	A,D	; DE -- адрес БУФ
 	CPI	9FH
 	JC	CPM	; >> D < 9Fh
 	CPI	0E0H
@@ -1308,7 +1308,7 @@ NBDS00:	MOV	A,M
 	POP	H
 	RET
 ;
-TBTRAP:	.DB 15,16,17,19,20,21,22,23,30,33,34,35,36,40,0
+TBTRAP:	.DB 15,16,17,19,20,21,22,23,30,33,34,35,36,40,0	;(файловые операции)
 ;
 NBDS10:	MOV	A,C
 	CPI	80H	; проверка на функции 80h
