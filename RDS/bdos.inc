@@ -74,7 +74,7 @@ TA047:	.DW	COLD	; 0	(CBIOS)
 	.DW	AA2D4	; 6	Прямой обмен с консолью
 	.DW	AA2ED	; 7	? Опрос состояния дополнительного устройства ввода
 	.DW	AA2F3	; 8	? Опрос состояния дополнительного устройства вывода
-	.DW	AA2F8	; 9	вывод последовательности символов ("...$")
+	.DW	PRNTS	; 9	вывод последовательности символов ("...$")
 	.DW	AA1E1	; 10	ввод строки
 	.DW	AA2FE	; 11	Получение состояния консоли
 	.DW	AAC7E	; 12	Возврат версии системы (=22h)
@@ -123,49 +123,13 @@ AA0B1:	LXI	H,TA0DC	; "File R/O"
 AA0B4:	CALL	AA0E5
 	JMP	0
 ;
-TA0BA:	.DB	042H	; B
-	.DB	064H	; d
-	.DB	06FH	; o
-	.DB	073H	; s
-	.DB	020H	; <sp>
-	.DB	045H	; E
-	.DB	072H	; r
-	.DB	072H	; r
-	.DB	020H	; <sp>
-	.DB	04FH	; O
-	.DB	06EH	; n
-	.DB	020H	; <sp>
+TA0BA:	.DB	"Bdos Err On "
 DA0C6:	.DB	020H	; <sp>
-	.DB	03AH	; :
-	.DB	020H	; <sp>
-	.DB	024H	; $
-TA0CA:	.DB	042H	; B
-	.DB	061H	; a
-	.DB	064H	; d
-	.DB	020H	; <sp>
-	.DB	053H	; S
-	.DB	065H	; e
-	.DB	063H	; c
-	.DB	074H	; t
-	.DB	06FH	; o
-	.DB	072H	; r
-	.DB	024H	; $
-TA0D5:	.DB	053H	; S
-	.DB	065H	; e
-	.DB	06CH	; l
-	.DB	065H	; e
-	.DB	063H	; c
-	.DB	074H	; t
-	.DB	024H	; $
-TA0DC:	.DB	046H	; F
-	.DB	069H	; i
-	.DB	06CH	; l
-	.DB	065H	; e
-	.DB	020H	; <sp>
-TA0E1:	.DB	052H	; R
-	.DB	02FH	; /
-	.DB	04FH	; O
-	.DB	024H	; $
+	.DB	": $"
+TA0CA:	.DB	"Bad Sector$"
+TA0D5:	.DB	"Select$"
+TA0DC:	.DB	"File "
+TA0E1:	.DB	"R/O$"
 ;
 AA0E5:	PUSH	H
 	CALL	AA1C9	; ПС+ВК
@@ -173,9 +137,9 @@ AA0E5:	PUSH	H
 	ADI	041H
 	STA	DA0C6	; пишем букву диска в строку
 	LXI	B,TA0BA	; "Bdos Err on X:"
-	CALL	AA1D3
+	CALL	AA1D3	; >> печать строки из BC до $ 
 	POP	B
-	CALL	AA1D3
+	CALL	AA1D3	; >> печать строки из BC до $
 AA0FB:	LXI	H,DA30E
 	MOV	A,M
 	MVI	M,000H
@@ -222,7 +186,12 @@ AA142:	STA	DA30E
 AA145:	MVI	A,001H
 	RET
 ;
-AA148:	LDA	DA30A
+AA1C9:	MVI	C,00DH	; вывод ПС+ВК
+	CALL	AA148
+	MVI	C,00AH
+;	JMP	AA148
+;
+AA148:	LDA	DA30A	; печать символа из C
 	ORA	A
 	JNZ	AA162
 	;NOP		; <= PUSH	B
@@ -278,7 +247,7 @@ AA196:	MVI	C,020H
 	RET
 ;
 AA1A4:	CALL	AA1AC
-	MVI	C,020H
+	MVI	C,020H	; ' '
 	CALL	PRINTC
 AA1AC:	MVI	C,008H
 	JMP	PRINTC
@@ -294,13 +263,13 @@ AA1B9:	LDA	DA30C	; поз. курсора
 	CALL	AA148
 	JMP	AA1B9
 ;
-AA1C9:	MVI	C,00DH
-	CALL	AA148
-	MVI	C,00AH
-	JMP	AA148
+PRNTS:	XCHG		; << печать строки из HL до $
+	MOV	C,L
+	MOV	B,H
+;	JMP	AA1D3
 ;
-AA1D3:	LDAX	B
-	CPI	024H
+AA1D3:	LDAX	B	; << печать строки из BC до $
+	CPI	024H	; '$'
 	RZ
 	INX	B
 	PUSH	B
@@ -308,6 +277,12 @@ AA1D3:	LDAX	B
 	CALL	BDPRNT	; (AA190)
 	POP	B
 	JMP	AA1D3
+;
+AA25F:	CPI	015H	; УС+U (новая строка с очисткой команды)
+	JNZ	AA26B
+	CALL	AA1B1
+	POP	H
+;	JMP	AA1E1
 ;
 AA1E1:	LDA	DA30C	; поз. курсора <<<< ПП ввод строки
 	STA	DA30B
@@ -396,12 +371,6 @@ AA24E:	LDA	DA30B
 	CALL	AA1A4
 	JMP	AA24E
 ;
-AA25F:	CPI	015H	; УС+U (новая строка с очисткой команды)
-	JNZ	AA26B
-	CALL	AA1B1
-	POP	H
-	JMP	AA1E1
-;
 AA26B:	CPI	012H	; CC+F1 или УС+R (новая строка с повторением команды)
 	JNZ	AA2A6
 AA270:	PUSH	B
@@ -483,11 +452,6 @@ AA2ED:	LDA	3
 AA2F3:	LXI	H,00003H
 	MOV	M,C
 	RET
-;
-AA2F8:	XCHG
-	MOV	C,L
-	MOV	B,H
-	JMP	AA1D3
 ;
 AA2FE:	CALL	AA123
 AA301:	STA	DA345
@@ -957,10 +921,6 @@ AA5F5:	LXI	H,DADEA
 	INR	A
 	RET
 ;
-AA5FE:	LXI	H,0FFFFH
-	SHLD	DADEA
-	RET
-;
 AA605:	LHLD	DADC8
 	XCHG
 	LHLD	DADEA
@@ -968,7 +928,11 @@ AA605:	LHLD	DADC8
 	SHLD	DADEA
 	CALL	AA595
 	JNC	AA619
-	JMP	AA5FE
+;	JMP	AA5FE
+;
+AA5FE:	LXI	H,0FFFFH
+	SHLD	DADEA
+	RET
 ;
 AA619:	LDA	DADEA
 	ANI	003H
