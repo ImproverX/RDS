@@ -442,7 +442,7 @@ BLOCKCOPY2:
 	ora b
 	jz $+7
 	dcr b
-	jmp BLOCKCOPY1
+	jmp BLOCKCOPY2
 	pop psw
 	push d
 	mov e,m
