@@ -1,21 +1,25 @@
-	ORG	100H
+;(перед компилированием преобразовать в KOI-8R)
+	.ORG	100H
 	JMP	START
-BOOTSC:	EQU	400H
-MBUF:	EQU	480H
+BOOTSC:	.EQU	400H
+MBUF:	.EQU	480H
 OPENF:	MVI	C,15
 	JMP	5
 SREAD:	MVI	C,20
 	JMP	5
 SETDMA:	MVI	C,26
 	JMP	5
-STR0:	DB 10,7,'Отсутствует входной файл !$'
-STR3:	DB 10,7,'Неверный адрес !$'
-STR4:	DB 10,7,'Диск назначения только А или В !$'
-STR5:	DB 10,7,'Диск отсутствует !$'
-STR7:	DB 10,'Готовы ?$'
-STR8:	DB 10,'OK.$'
-STRA:	DB 'System Generator для РДС,V1.00, Copyright (c)'
-	DB ' 1996 by Вьюнов В.А..$'
+STR0:	.DB 10,7,"Отсутствует входной"
+	.DB " файл !$"
+STR3:	.DB 10,7,"Неверный адрес !$"
+STR4:	.DB 10,7,"Диск назначения только"
+	.DB " А или В !$"
+STR5:	.DB 10,7,"Диск отсутствует !$"
+STR7:	.DB 10,"Готовы ?$"
+STR8:	.DB 10,"OK.$"
+STRA:	.DB "System Generator для РДС,"
+	.DB "V1.00, Copyright (c)"
+	.DB " 1996 by Вьюнов В.А..$"
 START:	LXI	SP,0
 	LXI	D,STRA
 	MVI	C,9
@@ -177,9 +181,9 @@ SAVE12:	CALL	SETSEC
 	MOV	C,M
 	CALL	SETTRC
 	RET
-DMA:	DW	0
-TRACK:	DB	0
-SECT:	DB	0
+DMA:	.DW	0
+TRACK:	.DB	0
+SECT:	.DB	0
 KEY:	JMP	0
 SELDSK:	JMP	0
 SETTRC:	JMP	0
@@ -229,5 +233,6 @@ FILL:	MOV	M,C
 	DCR	B
 	JNZ	FILL
 	RET
-DISK:	DB	0
-KSECT:	DB	0
+DISK:	.DB	0
+KSECT:	.DB	0
+	.END
