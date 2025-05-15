@@ -2,12 +2,14 @@
 	.ORG	100H
 ;#DEFINE NoPACK
 STDISP:	.EQU	0CA00H
-SELDSK:	.EQU	0FB1BH
-SETTRK:	.EQU	0FB1EH
-SETSEC:	.EQU	0FB21H
-SETDMA:	.EQU	0FB24H
-WRITE:	.EQU	0FB2AH
-READ:	.EQU	0FB27H
+VIRT:	.EQU	0FB00H
+KEY:	.EQU	VIRT+09H
+SELDSK:	.EQU	VIRT+1BH
+SETTRK:	.EQU	VIRT+1EH
+SETSEC:	.EQU	VIRT+21H
+SETDMA:	.EQU	VIRT+24H
+WRITE:	.EQU	VIRT+2AH
+READ:	.EQU	VIRT+27H
 ;OS:	.EQU	400H
 DISKS:	.EQU	0AE46H		; количество дисковых устройств -1
 STRA:	.EQU	0BF66H+1	; ссылка на надпись загрузчика
@@ -69,7 +71,7 @@ FIL0:	STAX	D
 	IN	1
 	ANI	40H
 	JNZ	EXIT	; >>> переход, если не нажата УС
-	LXI	D,STR2	; "Форматирование..."
+FKD0:	LXI	D,STR2	; "Форматирование..."
 	MVI	C,9
 	CALL	5
 	LXI	D,0202h	; D=02 -- диск C:, E=02 -- форматирование
@@ -81,7 +83,37 @@ FIL0:	STAX	D
 	MVI	M,'S'
 	INX	H
 	MVI	M,' '	; переименовываем в OS.COM
-EXIT:	MVI	E,2	;
+EXIT:	MVI	A,1	; отключение вывода ошибок
+	STA	3FH
+	LXI	B,80H	; проверка 1 сектора КД на ошибки
+	CALL	SETDMA
+	MVI	C,2	; КД
+	CALL	SELDSK
+	MVI	C,0	; трек 0
+	CALL	SETTRK
+	MVI	C,1	; сектор 1
+	CALL	SETSEC
+	CALL	READ
+	LDA	03Dh	; код ошибки
+	ANA	A
+	JNZ	FKD1	; >> ошибка чтения
+	LDA	00080h	; начало сектора
+	ANA	A
+	JZ	FKDD	; = 0
+	CPI	0E5h
+	JZ	FKDD	; = E5
+FKD1:	LXI	D,STR1	; "Форматировать?"
+	MVI	C,9
+	CALL	5
+	CALL	KEY
+	ANI	5FH
+	CPI	'D'
+	JZ	FKD0
+	CPI	'Y'
+	JZ	FKD0
+;	JMP	FKD0
+;	
+FKDD:	MVI	E,2	;
 	MVI	C,14	; Выбор диска 2 (КД)
 	CALL	5
 	LXI	B,0D80H	; Проверка текущего диска на статус Read only,если он установлен то "сброс".
@@ -166,6 +198,9 @@ BUFLP:	MOV  A, M
 INIHDD:	LXI	D,STRHDD	;"Инициализация HDD...$"
 	MVI	C,9
 	CALL	5
+	IN	57h	; читаем регистр статуса НЖМД
+	INR	A
+	JZ	HDERR	; считалось FF -- нет контроллера.
 	LXI	B,80H
 	CALL	SETDMA
 	MVI	A,2
@@ -185,7 +220,7 @@ INIH10:	PUSH	B
 	JNZ	INIH10	; цикл, 4 попытки
 	XRA	A
 	STA	3FH
-	STA	04h	; номер диска 0 (A:) для SETHDD
+HDERR:	STA	04h	; номер диска 0 (A:) для SETHDD
 	LXI	D,STRHDE	; "Ошибка"
 	MVI	C,9
 	CALL	5
@@ -221,7 +256,10 @@ APAR2:	SHLD	0	; => HDDAT+1 (BIOS) = (FFFFh - (число дискет))
 	MVI	A,23H	; 0010 0011b -- банк 0 как ОЗУ A000-DFFFh
 	OUT	10H
 	EI
-	RET
+	LXI	D,STRHDG	; "ОК"
+	MVI	C,9
+	JMP	5
+;	RET
 ;
 SAVE:	LXI	D,5CH
 	PUSH	D
@@ -459,8 +497,11 @@ ManyLiterals:
 #endif
 ;
 STR2:	.DB 10,"Форматирование диска C:.$"
+STR1:	.DB 10,"Ошибка каталога Квази-Диска."
+	.DB "Форматировать КД? (D/...)$"
 STRHDD:	.DB 10,"Инициализация HDD...$"
 STRHDE:	.DB " не найден.$"
+STRHDG:	.DB "готово.$"
 DMA:	.DW	0
 WSECT:	.DB	0
 FILE0:	.DB 0,"RDS     COM"	; или OS.COM после форматирования КД
