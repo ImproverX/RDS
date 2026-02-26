@@ -606,7 +606,12 @@ KVRD:	CALL	KVRAS	; расчёт адреса сектора на КД	; <<<<< ч
 	SPHL
 	LXI	H,VDMA	; куда читать
 	LXI	B,0040h	; B=0 (КС), C=64 (счётчик)
-KVRD10:	LDA	PORT10
+KVRD10:	LDA	DISK
+	ORA     A	; CPI     2
+	LDA	PORT10
+	JPO	10h	;JZ	10H	; Диск = 2 (C:)
+	OUT	11h	; КД 11
+	XRA     A
 	JMP	10H	; >>> чтение КД РУ7
 KVRD11:	MOV	A,B	; <<< возврат из ПП 0010h
 	MOV	M,E
@@ -618,11 +623,16 @@ KVRD11:	MOV	A,B	; <<< возврат из ПП 0010h
 	MOV	B,A
 	DCR	C
 	JNZ	KVRD10	; цикл чтения сектора
-	MVI	A,1CH
 	LXI	H,KVR11D
-	SHLD	18H
+	SHLD	1BH	; правим адрес возврата из 10h
 	LHLD	KCRC	; адрес контрольной суммы
 	SPHL
+KVRD15:	LDA	DISK
+	ORA     A	; CPI     2
+	MVI	A,1CH
+	JPO	10h	;JZ	10H	; Диск = 2 (C:)
+	OUT	11h	; КД 11
+	XRA     A
 	JMP	10H	; >>> чтение КД РУ7
 KVR11D:	MOV	A,E	; <<< возврат из ПП 0010h
 	CMP	D
@@ -635,15 +645,9 @@ KVDR09:	MOV	E,B
 	CPI	3	; >=3
 	JNC	KVRD13	; исправление КС по сектору (!)
 KVDR10:	LXI	SP,0
-	LXI	H,0011h	; 
-	SHLD	11h	; делаем OUT 11h и NOP
-	LXI	H,KVDR11
-	SHLD	18H	; поправляем адрес возврата
-	XRA	A	; отключение КД11
-	JMP	10H	; >>> (nop) КД РУ7
 KVDR11:	LXI	H,SIXBUF; откуда	; <<< возврат из ПП 0010h
 	LXI	D,10H	; куда
-	MVI	B,10	; сколько
+	MVI	B,13	; сколько
 	CALL	COPY10	; восстанавливаем память
 	EI
 	MOV	A,C
@@ -663,11 +667,10 @@ KVRD12:	CMP	B	; < ошибка чтения КС
 ;
 KVRD13:	MOV	D,E	; исправление КС
 KVRD14:	LXI	H,KVDR10
-	SHLD	18H	; правим адрес возврата
+	SHLD	1BH	; правим адрес возврата
 	MVI	A,0D5H	; = PUSH D
 	STA	12H
-	MVI	A,1CH
-	JMP	10H	; >>> запись КД РУ7
+	JMP	KVRD15	; >>> запись КД РУ7
 ;
 			; <<<<< запись на КД
 WRITKV:	MOV	A,M	; A=DISK0
@@ -686,7 +689,11 @@ KVWR00:	LXI	H,VDMA	; <(1)
 	DI
 	DAD	SP
 	SHLD	KVDR10+1
-	CALL	WRSIX
+	CALL	RDSIX
+	LXI	H, KVWR11
+	SHLD	0001Bh
+	MVI	A, 0D5h	; "PUSH D"
+	STA	00012h
 	LHLD	KADR
 	LXI	D,128
 	SPHL
@@ -701,8 +708,7 @@ KVWR10:	DCX	H
 	MOV	E,M
 	ADD	E
 	MOV	B,A	; B= КС
-	LDA	PORT10
-	JMP	10H	; >>> запись КД РУ7
+	JMP	KVRD10	;JMP	10H	; >>> запись КД РУ7
 KVWR11:	DCR	C	; <<< возврат из ПП 10h
 	JNZ	KVWR10	; цикл записи сектора
 	LHLD	KCRC	; адрес контрольной суммы
@@ -713,10 +719,10 @@ KVWR11:	DCR	C	; <<< возврат из ПП 10h
 	MOV	E,B
 	JMP	KVRD14	; >> запись КС
 ;
-RDSIX:	LXI	H,RDRU7	; часть патча для РУ7 (и КД11)
-RDSIX0: LXI	D,10H
-	LXI	B,SIXBUF
-	MVI	A,10
+RDSIX:	LXI	H,RWRU7	; часть патча для РУ7 (и КД11)
+	LXI	D,10H	; куда
+	LXI	B,SIXBUF; временный буфер для сохранения памяти
+	MVI	A,13
 SIXC10:	PUSH	PSW
 	LDAX	D
 	STAX	B
@@ -728,29 +734,17 @@ SIXC10:	PUSH	PSW
 	POP	PSW
 	DCR	A
 	JNZ	SIXC10
-	LDA	DISK	; проверка на КД11
-	CPI	2
-	RZ		; =КД10, пропускаем настройку на КД11
-	MVI	A,11h	; тут правим ПП по адресу 10h на КД11
-	STA	0011h
 	RET
 ;
-WRSIX:	LXI	H,WRRU7
-	JMP	RDSIX0
-;
-RDRU7:	OUT	10H	; (менять на 11h)
-	POP	D
+RWRU7:	OUT	10h
+	POP	D	; [0012h]
+	XRA	A
+	OUT	11h
 	MVI	A,P10	; = 20h
-	OUT	10H
-	JMP	KVRD11
+	OUT	10h
+	JMP	KVRD11	; [001Bh]
 ;
-WRRU7:	OUT	10H	; (менять на 11h)
-	PUSH	D
-	MVI	A,P10	; = 20h
-	OUT	10H
-	JMP	KVWR11
-;
-SIXBUF:	.DS	10	; <=
+SIXBUF:	.DS	13	; <=
 ;
 KVRAS:	LDA	TRC0	; <<< расчёт адреса сектора на КД
 	MOV	B,A
@@ -1151,7 +1145,7 @@ FSWRNR:	LXI	H,STRNTR
 	CALL	ASK
 	JMP	FSWR00
 ;
-FSWR22:	MOV	A,M
+FSWR22:	MOV	A,M	; вывод строки до 00
 	INX	H
 	ANA	A
 	RZ
@@ -1731,7 +1725,7 @@ HLA:	ADD	L
 	RET
 ;
 ; тестирование КД: вход DE
-; D= номер диска; E= Х-тест, 1-восстановить КС, 2-форматирование
+; D= номер диска; E= 0-тест, 1-восстановить КС, >1-форматирование
 TEST:	LDA	3FH	; режим обработки ошибок
 	PUSH	PSW
 	MOV	C,D	; установка диска
@@ -1771,7 +1765,7 @@ TST0:	INR	A
 	MVI	A,1	; <<< чтение с дискового устройства
 TST1:	STA	OPER	; 0-запись, 1-чтение
 ;;	LXI	H,STTS2	; "Форматирование квази-диска"
-;;	CZ	FSWR22
+;;	CZ	FSWR22test
 	LXI	H,PARAM
 	LXI	D,PARAM0
 	MVI	B,7
