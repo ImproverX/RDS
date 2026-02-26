@@ -1035,16 +1035,46 @@ AF8C4:	LXI	D,EXT
 	PUSH	D
 	CALL	AF654
 	POP	D
-	LXI	H,ECOM
-	CALL	AF640
+	LXI	H,ECOM	; "COM"
+	CALL	AF640	; перенос из адр[HL] в адр[DE] 3 байт
 	CALL	OPEN2
-	JNZ	COM
+	JNZ	COM	; >> файл открылся, выполняем
 	LXI	D,EXT
-	LXI	H,EBAT
-	CALL	AF640
+	LXI	H,EBAT	; "BAT"
+	CALL	AF640	; перенос из адр[HL] в адр[DE] 3 байт
 	CALL	OPEN2
-	JZ	AF96B
-BAT:	CALL	AF666
+	JNZ	BAT	; >> файл открылся, выполняем
+	LXI	D,EXT
+	LXI	H,EROM	; "ROM"
+	CALL	AF640	; перенос из адр[HL] в адр[DE] 3 байт
+	CALL	OPEN2
+	JZ	AF96B	; >> файл не найден
+ROM:	CALL	LOADF	; 
+	JNC	AF971	; >> ошибка загрузки
+	DI
+	MOV	A,H
+	CPI	0A0h
+	JC	ROMZ	; >> конечный адрес < A000h 
+	; перенос данных с КД в память
+	MVI	A,01Ch	; 00011100b -- вкл. банк 3 как стек
+	OUT	010h	; КД 10
+	LXI	H,0A000h	; куда (ОЗУ)
+	SPHL			; откуда (КД)
+	MVI	A,0BFh	; до какого адреса (BFFFh)
+ROMX:	POP	D
+	MOV	M,E
+	INX	H
+	MOV	M,D
+	INX	H
+	CMP	H
+	JNC	ROMX	; цикл переноса с КД в ОЗУ
+ROMZ:	XRA	A
+	OUT	010h
+	OUT	011h
+	LXI	SP,00000H
+	JMP	X0100
+;
+BAT:	CALL	AF666	; выполняем BAT
 	CALL	OBRSTR
 	LXI	D,CBUF
 	LDA	UDISK
@@ -1076,33 +1106,40 @@ EXE11C:	LDAX	D
 	DCR	B
 	JNZ	EXE11C
 	RET
-COM:	LXI	H,CBUF+1
+;	
+LOADF:	LXI	H,CBUF+1
 	LXI	D,4CH
 	LDA	UDISK
 	STAX	D
 	INX	D
 	MVI	B,11
 	CALL	AF642
-	LXI	H,100H
+	LXI	H,100H	; начальный адрес
 AF8E1:	PUSH	H
 	XCHG
 	CALL	SETDMA
 	LXI	D,CBUF
 	CALL	SREAD
+	POP	H	; HL = адрес записи
 	JNZ	AF901
-	POP	H
 	LXI	D,00080H
-	DAD	D
+	DAD	D	; HL + 1 сектор
 	LXI	D,DF200
 	MOV	A,L
 	SUB	E
 	MOV	A,H
 	SBB	D
-	JNC	AF971
-	JMP	AF8E1
-AF901:	POP	H
-	DCR	A
-	JNZ	AF971
+	RNC		; >> дошли до CCPH, ошибка загрузки
+	JMP	AF8E1	; цикл загрузки файла по секторам
+;	
+AF901:	DCR	A
+	STC		; С = 1
+	RZ		; >> конец файла, загрузка окончена
+	CMC		; С = 0
+	RET		; >> возврат с ошибкой
+;
+COM:	CALL	LOADF	; 
+	JNC	AF971	; >> ошибка загрузки
 	CALL	AF666
 	CALL	DECOD
 	LXI	H,UDISK
@@ -1215,18 +1252,13 @@ AF94F:	CALL    CRLF
 	LXI	H,0
 	PUSH	H
 	JMP	X0100
+;	
 AF96B:	CALL	AF666
 	JMP	BADCOM
 ;
 AF971:	LXI	B,TF97A
 	CALL    PRINT
-	JMP	AF986
-;
-; >> NO EXECUTION PATH TO HERE <<
-TF97A:	.DB	"BAD LOAD",0
-ECOM:	.DB	"COM"
-EBAT:	.DB	"BAT"
-;
+;	JMP	AF986
 AF986:	CALL	AF666
 KONEC:	CALL	DECOD
 	LDA	CBUF+1
@@ -1235,6 +1267,13 @@ KONEC:	CALL	DECOD
 	ORA	M
 	JNZ	BADCOM
 	JMP	MAIN
+;
+; >> NO EXECUTION PATH TO HERE <<
+TF97A:	.DB	"BAD LOAD",0
+ECOM:	.DB	"COM"
+EBAT:	.DB	"BAT"
+EROM:	.DB	"ROM"
+ER00:	.DB	"R0M"
 ;
 ; >> NO EXECUTION PATH TO HERE <<
 DBUF:	.DW	0,0,0,0,0,0,0,0
