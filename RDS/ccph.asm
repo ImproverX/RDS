@@ -1035,23 +1035,41 @@ AF8C4:	LXI	D,EXT
 	PUSH	D
 	CALL	AF654
 	POP	D
+	PUSH	D
 	LXI	H,ECOM	; "COM"
 	CALL	AF640	; перенос из адр[HL] в адр[DE] 3 байт
 	CALL	OPEN2
+	POP	D
 	JNZ	COM	; >> файл открылся, выполняем
-	LXI	D,EXT
+	PUSH	D
+;	LXI	D,EXT
 	LXI	H,EBAT	; "BAT"
 	CALL	AF640	; перенос из адр[HL] в адр[DE] 3 байт
 	CALL	OPEN2
+	POP	D
 	JNZ	BAT	; >> файл открылся, выполняем
-	LXI	D,EXT
+	PUSH	D
+;	LXI	D,EXT
 	LXI	H,EROM	; "ROM"
 	CALL	AF640	; перенос из адр[HL] в адр[DE] 3 байт
 	CALL	OPEN2
+	POP	D
+	JNZ	ROM	; >> файл открылся, выполняем
+;	LXI	D,EXT
+	LXI	H,ER00	; "R0M"
+	CALL	AF640	; перенос из адр[HL] в адр[DE] 3 байт
+	CALL	OPEN2
 	JZ	AF96B	; >> файл не найден
+R00:	CALL	LOADF	; 
+	JNC	AF971	; >> ошибка загрузки
+	XRA	A	; "NOP"
+	STA	ROMB
+	SHLD	ROMC	; "...,[кон.адрес]"
+	JMP	ROM0
+;
 ROM:	CALL	LOADF	; 
 	JNC	AF971	; >> ошибка загрузки
-	DI
+ROM0:	DI
 	MOV	A,H
 	CPI	0A0h
 	JC	ROMZ	; >> конечный адрес < A000h 
@@ -1072,7 +1090,15 @@ ROMZ:	XRA	A
 	OUT	010h
 	OUT	011h
 	LXI	SP,00000H
-	JMP	X0100
+ROMB:	JMP	00100h	; запуск rom / затирается при r0m на "NOP;NOP;LXI B, [кон.адрес]"
+ROMC:	.dw 0			; =[кон.адрес]
+	LXI	SP,00100h	; откуда
+	LXI	H,00000h	; куда
+	MVI	A, 0C3h		; = JMP	...
+	STA	ROMB
+	SHLD	ROMB+1		; ... 00000H
+	MOV	A,B		; до какого адреса
+	JMP	ROMX
 ;
 BAT:	CALL	AF666	; выполняем BAT
 	CALL	OBRSTR
