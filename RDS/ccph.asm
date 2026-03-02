@@ -1113,6 +1113,7 @@ EXEC12:	CALL	CHKEXT
 	CALL	OPEN2
 	POP	B
 	JZ	AF96B	; >> ошибка открытия файла
+	XRA	A
 	ORA	C
 	JZ	COM
 	DCR	C
