@@ -56,7 +56,7 @@ FIL0:	STAX	D
 	JC	FIL0		; цикл до адреса E000h
 #else
 	LXI	D,LDR		; куда
-	CALL	unlzsa1		; распаковка
+	CALL	UNPACK		; распаковка
 #endif
 	CALL	STDISP		; (0CA00H)
 ;	LXI	H,0E4F2h	; ='РД'		>> перенесено в лоадер
@@ -359,141 +359,8 @@ WRN:	INX	H
 	ANA	A	; установить Z<>0
 	JMP	NEND
 #ifndef NoPACK
-;
-;input: 	hl=compressed data start
-;		de=uncompressed destination start
-unlzsa1:
-	mvi b,0
-	jmp ReadToken
-;
-NoLiterals:
-	xra m
-	push d
-	inx h
-	mov e,m
-	jm LongOffset
-ShortOffset:
-	mvi d,0FFh
-	adi 3
-	cpi 15+3
-	jnc LongerMatch
-CopyMatch:
-	mov c,a
-CopyMatch_UseC:
-	inx h
-	xthl
-	xchg
-	dad d
-	mov a,m
-	inx h
-	stax d
-	inx d
-	dcx b
-	mov a,m
-	inx h
-	stax d
-	inx d
-	dcx b
-	dcx b
-	inr c
-BLOCKCOPY1:
-	mov a,m
-	stax d
-	inx h
-	inx d
-	dcr c
-	jnz BLOCKCOPY1
-	xra a
-	ora b
-	jz $+7
-	dcr b
-	jmp BLOCKCOPY1
-	pop h
-ReadToken:
-	mov a,m
-	ani 70h
-	jz NoLiterals 
-	cpi 70h
-	jz MoreLiterals
-	rrc
-	rrc
-	rrc
-	rrc
-	mov c,a
-	mov b,m
-	inx h
-	mov a,m		; <<<
-	stax d
-	inx h
-	inx d
-	dcr c
-	jnz $-5		; >>>
-	push d
-	mov e,m
-	mvi a,8Fh
-	ana b
-	mvi b,0
-	jp ShortOffset
-LongOffset:
-	inx h
-	mov d,m
-	adi -128+3
-	cpi 15+3
-	jc CopyMatch
-LongerMatch:
-	inx h
-	add m
-	jnc CopyMatch
-	mov b,a
-	inx h
-	mov c,m
-	jnz CopyMatch_UseC
-	inx h
-	mov b,m
-	mov a,b
-	ora c
-	jnz CopyMatch_UseC
-	pop d
-	ret
-;
-MoreLiterals:		
-	xra m
-	push psw
-	mvi a,7
-	inx h
-	add m
-	jc ManyLiterals
-CopyLiterals:
-	mov c,a
-CopyLiterals_UseC:
-	inx h
-	dcx b
-	inr c
-BLOCKCOPY2:
-	mov a,m
-	stax d
-	inx h
-	inx d
-	dcr c
-	jnz BLOCKCOPY2
-	xra a
-	ora b
-	jz $+7
-	dcr b
-	jmp BLOCKCOPY2
-	pop psw
-	push d
-	mov e,m
-	jp ShortOffset
-	jmp LongOffset
-ManyLiterals:
-	mov b,a
-	inx h
-	mov c,m
-	jnz CopyLiterals_UseC
-	inx h
-	mov b,m
-	jmp CopyLiterals_UseC
+UNPACK:
+	#include lzo28_f.asm
 #endif
 ;
 STR2:	.DB 10,"Форматирование диска C:.$"
