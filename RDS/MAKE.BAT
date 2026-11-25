@@ -18,5 +18,5 @@ tasm virt.asm
 if ERRORLEVEL 1 pause
 
 copy /b loaderkd.obj+ccph.obj+bdosbios.obj+disp.obj+vird7.obj+virt.obj pack1.bin
-lzsa -f1 -r pack1.bin pack1.pak
-copy /b rdsh.obj+pack1.pak rds308.rom
+lzo28 pack1.bin pack1.lzo
+copy /b rdsh.obj+pack1.lzo rds310.rom
