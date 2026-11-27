@@ -1,5 +1,6 @@
 ;LZO28 fast unpacker for 8080, Ivan Gorodetsky 
 ;v2 2026-11-23 111-143 bytes
+;v3 2026-11-25 103-135 bytes
 ;
 ; lxi h,SrcAdr
 ; lxi d,DestAdr
@@ -123,11 +124,11 @@ LZO28_CopyLink:
         mov     b, a
         jnc     LZO28_LDIR2
         ora     a
-        jz      LZO28_copy1
         mov     a, m
         stax    d
         NEXT_HL
         NEXT_DE
+        jz      LZO28_copy1
 LZO28_LDIR2:
         mov     a, m
         stax    d
@@ -139,13 +140,7 @@ LZO28_LDIR2:
         NEXT_DE
         dcr     b
         jnz     LZO28_LDIR2
-        pop     h
-        jmp     LZO28_MainLoop
 LZO28_copy1:
-        mov     a, m
-        stax    d
-        NEXT_HL
-        NEXT_DE
         pop     h
         jmp     LZO28_MainLoop
 #ifndef SHORT_WIN
